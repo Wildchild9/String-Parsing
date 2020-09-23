@@ -8,248 +8,54 @@
 
 import Foundation
 
-print("Hello world")
 
-enum TokenizationError {
-    case ambiguousToken
-}
-protocol Tokenizable {
-    func consumeNextToken<T>(from input: T) throws -> Substring? where T: StringProtocol, T.SubSequence == Substring
-}
-extension Tokenizable {
-    func matches<T>(_ input: T) -> Bool where T: StringProtocol, T.SubSequence == Substring {
-        guard let _ = try? consumeNextToken(from: input) else {
-            return false
-        }
-        return true
-    }
-}
+//TODO: Get rid of constant token in favour of identifier and derive constants in parser
 
-struct BaseToken {
-    var definition: String
-    var id: String = ""
-    
-    init(_ definition: String) {
-        self.definition = definition
-    }
-}
-extension BaseToken: Tokenizable {
-    func consumeNextToken<T>(from input: T) throws -> Substring? where T: StringProtocol, T.SubSequence == Substring {
-        guard definition.count <= input.count else {
-            return nil
-        }
-        var idx = input.startIndex
-        for char in definition {
-            guard char == input[idx] else {
-                return nil
-            }
-            idx = input.index(after: idx)
-        }
-        return input[idx...]
-    }
-}
-
-extension String: Tokenizable {
-    func consumeNextToken<T>(from input: T) throws -> Substring? where T: StringProtocol, T.SubSequence == Substring {
-        let token = BaseToken(self)
-        return try token.consumeNextToken(from: input)
-    }
-}
-struct LogicalOrToken<A, B> where A: Tokenizable, B: Tokenizable {
-    var a: A
-    var b: B
-}
-
-extension LogicalOrToken: Tokenizable {
-    // Currently, the left-most token that's matched will be used
-    // Solutions:
-    //   - Add precedence
-    //   - Check length
-    //   - Proceed with tokenization but mark short-circuit so if there is an error down the line you can return (don't know if that is possible with this model)
-    //    func consumeNextToken<T>(from input: T) throws -> (tokens: [Tokenizable], output: Substring? where T: StringProtocol, T.SubSequence == Substring {
-    
-    func consumeNextToken<T>(from input: T) throws -> Substring? where T: StringProtocol, T.SubSequence == Substring {
-        if let tokenizedOutput = try a.consumeNextToken(from: input) {
-            return tokenizedOutput
-        } else if let tokenizedOutput = try b.consumeNextToken(from: input) {
-            return tokenizedOutput
-        }
-        return nil
-    }
-}
-
-func || <T, U>(lhs: T, rhs: U) -> LogicalOrToken<T, U> where T: Tokenizable, U: Tokenizable {
-    return LogicalOrToken(a: lhs, b: rhs)
-}
-
-struct OptionalToken<T> where T: Tokenizable {
-    var token: T
-    init(_ token: T) {
-        self.token = token
-    }
-}
-extension OptionalToken: Tokenizable {
-    func consumeNextToken<T>(from input: T) throws -> Substring? where T: StringProtocol, T.SubSequence == Substring {
-        if let output = try token.consumeNextToken(from: input) {
-            return output
-        }
-        return input[...]
-    }
-}
-
-extension Tokenizable {
-    func opt() -> OptionalToken<Self> {
-        return OptionalToken(self)
-    }
-}
-
-struct TokenChain<A, B>: Tokenizable where A: Tokenizable, B: Tokenizable {
-    var a: A
-    var b: B
-    
-    func consumeNextToken<T>(from input: T) throws -> Substring? where T: StringProtocol, T.SubSequence == Substring {
-        guard let partiallyConsumedStr = try a.consumeNextToken(from: input) else {
-            return nil
-        }
-        return try b.consumeNextToken(from: partiallyConsumedStr)
-    }
-}
-func +<T, U>(lhs: T, rhs: U) -> TokenChain<T, U> where T: Tokenizable, U: Tokenizable {
-    return TokenChain(a: lhs, b: rhs)
-}
-
-class AnyToken: Tokenizable {
-    var token: Tokenizable!
-    
-    init() { }
-    init(_ token: Tokenizable) {
-        self.token = token
-    }
-    
-    func consumeNextToken<T>(from input: T) throws -> Substring? where T: StringProtocol, T.SubSequence == Substring {
-        return try token.consumeNextToken(from: input)
-    }
-}
-
-class RecursiveToken: Tokenizable {
-    var token: Tokenizable!
-    init(_ token: (RecursiveToken) -> Tokenizable) {
-        self.token = token(self)
-    }
-    func consumeNextToken<T>(from input: T) throws -> Substring? where T: StringProtocol, T.SubSequence == Substring {
-        return try token.consumeNextToken(from: input)
-    }
-}
-
-//var digit = "0" || "1" || "2" || "3" || "4" || "5" || "6" || "7" || "8" || "9"
+//let prefix_operator = "+" || "-"
 //
-////var digits = AnyToken()
-////var _digits = digits
-////digits.token = digit + _digits???
-//var digits = RecursiveToken { digit + $0.opt() }
-////var (digits, _digits) = AnyToken.shared
-////digits.token = digit + _digits*
-//var str = "1234abc"
-//print(try digit.consumeNextToken(from: str)!)
-//print(try digits.consumeNextToken(from: str)!)
-////var digit = BaseToken("0") | "1"// | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
-//print(type(of: digit))
-//print(type(of: digits))
+//let digit = "0" || "1" || "2" || "3" || "4" || "5" || "6" || "7" || "8" || "9"
+//let digits = RecursivePattern { digit + $0.opt() }
 //
-//print("hello")
+//let number = digits + ("." + digits).opt()
 //
+//let spacing = RecursivePattern { " " + $0.opt() }
 //
-//var thing = 0_______6
-//var decimalLiteralCharacter = digit || "_"
-//var decimalLiteralCharacters = RecursiveToken { decimalLiteralCharacter + $0.opt() }
-//var decimalLiteral = digit + decimalLiteralCharacters.opt()
-//print(try decimalLiteral.consumeNextToken(from: "1___2_3435_452abc"))
-//struct RecursiveToken: Tokenizable {
-//    init() { }
-//}
+//let expression = SharedPattern()
+//let expression_list = RecursivePattern { expression || (spacing.opt() + "," + spacing.opt() + $0) }
 //
-//precedencegroup GrammarAssignmentPrecedence {
-//    higherThan: AssignmentPrecedence
-//    lowerThan: FunctionArrowPrecedence
-//}
+//let binary_operator = "+" || "-" || "*" || "/" || "^"
+//let spaced_binary_operator = RecursivePattern { binary_operator || (" " + $0 + " ") }
 //
-//prefix operator <=//: GrammarAssignmentPrecedence
-//prefix func <=<T>(_ token: () -> T) -> T where T: Tokenizable {
-//    return token()
-//}
-//prefix func <=<T>(_ token: @autoclosure () -> T) -> T where T: Tokenizable {
-//    return token()
-//}
-//prefix func <= (_ token: (RecursiveToken) -> Tokenizable) -> RecursiveToken {
-//    return RecursiveToken(token)
-//}
+//let lowercase_latin_character = "a" || "b" || "c" || "d" || "e" || "f" || "g" || "h" || "i" || "j" || "k" || "l" || "m" || "n" || "o" || "p" || "q" || "r" || "s" || "t" || "u" || "v" || "w" || "x" || "y" || "z"
+//let uppercase_latin_character = "A" || "B" || "C" || "D" || "E" || "F" || "G" || "H" || "I" || "J" || "K" || "L" || "M" || "N" || "O" || "P" || "Q" || "R" || "S" || "T" || "U" || "V" || "W" || "X" || "Y" || "Z"
+//let latin_character = lowercase_latin_character || uppercase_latin_character
 //
-//func token<T>(_ token: () -> T) -> T where T: Tokenizable {
-//    return token()
-//}
-//func token<T>(_ token: @autoclosure () -> T) -> T where T: Tokenizable {
-//    return token()
-//}
-//func token (_ token: (RecursiveToken) -> Tokenizable) -> RecursiveToken {
-//    return RecursiveToken(token)
-//}
-
-let prefix_operator = "+" || "-"
-
-let digit = "0" || "1" || "2" || "3" || "4" || "5" || "6" || "7" || "8" || "9"
-let digits = RecursiveToken { digit + $0.opt() }
-
-let number = digits + ("." + digits).opt()
-
-let spacing = RecursiveToken { " " + $0.opt() }
-
-let expression = AnyToken()
-let expression_list = RecursiveToken { expression || (spacing.opt() + "," + spacing.opt() + $0) }
-
-let binary_operator = "+" || "-" || "*" || "/" || "^"
-let spaced_binary_operator = RecursiveToken { binary_operator || (" " + $0 + " ") }
-
-let lowercase_latin_character = "a" || "b" || "c" || "d" || "e" || "f" || "g" || "h" || "i" || "j" || "k" || "l" || "m" || "n" || "o" || "p" || "q" || "r" || "s" || "t" || "u" || "v" || "w" || "x" || "y" || "z"
-let uppercase_latin_character = "A" || "B" || "C" || "D" || "E" || "F" || "G" || "H" || "I" || "J" || "K" || "L" || "M" || "N" || "O" || "P" || "Q" || "R" || "S" || "T" || "U" || "V" || "W" || "X" || "Y" || "Z"
-let latin_character = lowercase_latin_character || uppercase_latin_character
-
-let identifier = RecursiveToken { latin_character + $0.opt() }
-
-let parenthesized_expression = "(" + spacing.opt() + expression + spacing.opt() + ")"
-
-let unary_function_expression =  identifier + parenthesized_expression
-let temp1 = identifier + "(" + spacing.opt()
-let temp2 = temp1 + expression + spacing.opt() + ","
-let binary_function_expression = temp2 + spacing.opt() + expression + spacing.opt() + ")"
-
-let function_expression = unary_function_expression || binary_function_expression
-
-let eulers_number = "e"
-let pi = "π" || "pi"
-
-let constant = prefix_operator.opt() + (eulers_number || pi)
-
-let primary_expression = function_expression || number || constant || parenthesized_expression
-
-let prefix_expression = prefix_operator.opt() + primary_expression
-
-let binary_expression = spaced_binary_operator + prefix_expression
-let binary_expressions = RecursiveToken { binary_expression + $0.opt() }
-
-expression.token = prefix_expression + binary_expressions.opt()
-
-var exp = "((4) + 10 - 7) - (-64.29434) - 7 ^ 4 + cos(180 - 493 + sin(20))"
-print(exp)
-
-//print(try expression.consumeNextToken(from: exp))
-//var output = ""
-//dump(expression, to: &output)
+//let identifier = RecursivePattern { latin_character + $0.opt() }
 //
-//output = output.replacingOccurrences(of: "__lldb_expr_\\d+.", with: "", options: .regularExpression)
-//print(output)
+//let parenthesized_expression = "(" + spacing.opt() + expression + spacing.opt() + ")"
 //
-//print(try eulers_number.consumeNextToken(from: "eat"))
-//print(try eulers_number.consumeNextToken(from: "at"))
+//let unary_function_expression =  identifier + parenthesized_expression
+//let temp1 = identifier + "(" + spacing.opt()
+//let temp2 = temp1 + expression + spacing.opt() + ","
+//let binary_function_expression = temp2 + spacing.opt() + expression + spacing.opt() + ")"
+//
+//let function_expression = unary_function_expression || binary_function_expression
+//
+//let eulers_number = "e"
+//let pi = "π" || "pi"
+//
+//let constant = prefix_operator.opt() + (eulers_number || pi)
+//
+//let primary_expression = function_expression || number || constant || parenthesized_expression
+//
+//let prefix_expression = prefix_operator.opt() + primary_expression
+//
+//let binary_expression = spaced_binary_operator + prefix_expression
+//let binary_expressions = RecursivePattern { binary_expression + $0.opt() }
+//
+//expression.pattern = prefix_expression + binary_expressions.opt()
+
+
 
 
 //protocol Token {
@@ -575,319 +381,633 @@ print(exp)
 //
 //print(tokenize(exp))
 
-typealias Pattern = Tokenizable
 
-//struct Foo {
-//    let a = 3
-//    let b = 4
-//    let c = "hello"
-//}
-//
-//
-//let foo = Foo()
-//let mirror = Mirror(reflecting: foo)
-//
-//print(mirror.displayStyle)
-//
-//for child in mirror.children {
-//    print("Property name:", child.label)
-//    print("Property value:", child.value)
-//}
 
-//TODO: Allow throwing functions
-struct CharacterToken: Tokenizable {
-    var condition: (Character) -> Bool
-    init(_ condition: @escaping (Character) -> Bool) {
-        self.condition = condition
-    }
-
-    func consumeNextToken<T>(from input: T) throws -> Substring? where T: StringProtocol, T.SubSequence == Substring {
-        if let firstCharacter = input.first, condition(firstCharacter) {
-            return input.dropFirst()
-        }
-        return nil
-    }
-}
-
-extension KeyPath: Tokenizable where Root == Character, Value == Bool {
-    func consumeNextToken<T>(from input: T) throws -> Substring? where T: StringProtocol, T.SubSequence == Substring {
-        if let firstCharacter = input.first, firstCharacter[keyPath: self] {
-            return input.dropFirst()
-        }
-        return nil
-    }
-}
-@propertyWrapper
-struct Token {
-    var pattern: Pattern
-    init(wrappedValue: Pattern) {
-        self.pattern = wrappedValue
-    }
+enum TokenClassification: Parsable, CaseIterable {
+    typealias TokenType = Self
     
-    var wrappedValue: Pattern {
-        get {
-            return pattern
-        }
-        set {
-            pattern = newValue
-        }
-    }
-}
-class LabelledToken: Tokenizable {
-    var label: String
-    var pattern: Pattern
     
-    init(label: String, pattern: Pattern) {
-        self.label = label
-        self.pattern = pattern
-    }
-    
-    func consumeNextToken<T>(from input: T) throws -> Substring? where T : StringProtocol, T.SubSequence == Substring {
-        return try pattern.consumeNextToken(from: input)
-    }
-}
-class MatchedToken: LabelledToken {
-    var match: Substring
-    
-    init(label: String, pattern: Pattern, match: Substring) {
-        self.match = match
-        super.init(label: label, pattern: pattern)
-    }
-}
-extension MatchedToken: CustomStringConvertible {
-    var description: String {
-        return label
-    }
-}
-
-//TODO: Get rid of constant token in favour of identifier and derive constants in parser
-protocol LexerProtocol: CaseIterable {
-    var pattern: Pattern { get }
-    var label: String { get }
-}
-extension LexerProtocol {
-    var label: String {
-        return String(describing: self)
-    }
-}
-extension LexerProtocol where Self: RawRepresentable, RawValue == String {
-    var label: String {
-        return rawValue
-    }
-}
-struct MatchedEnumToken<T> where T: LexerProtocol {
-    var token: T
-    var match: Substring
-}
-extension MatchedEnumToken: CustomStringConvertible {
-    var description: String {
-        return token.label
-    }
-}
-extension LexerProtocol {
-
-    static func tokenize(_ input: String) throws -> [MatchedEnumToken<Self>] {
-        let tokens = self.allCases
-        var substr = input[...]
-        var matchedTokens = [MatchedEnumToken<Self>]()
-        // Attempts to consume tokens until substr is empty, at which point the whole input has been tokenized
-        searchLoop: while !substr.isEmpty {
-            // Tries to consume each token from the start of substr
-            for token in tokens {
-                if let consumedString = try? token.pattern.consumeNextToken(from: substr) {
-                    let matchedToken = MatchedEnumToken(
-                        token: token,
-                        match: substr[..<consumedString.startIndex]
-                    )
-                    substr = consumedString
-                    matchedTokens.append(matchedToken)
-                    continue searchLoop
-                }
-            }
-            let failureIndex = substr.startIndex
-            throw Lexer.Error.cannotMatchToken(source: input, position: failureIndex)
-        }
-        return matchedTokens
-    }
-}
-
-
-enum LexerEnum: LexerProtocol {
-    case left_parentheses
-    case right_parentheses
+    case left_parenthesis
+    case right_parenthesis
     case number
-    case operation
+    case binary_operator
+    case prefix_operator
+    case postfix_operator
     case identifier
-    case constant
     case whitespace
+    case comma_separator
     
     private static let digit = "0" || "1" || "2" || "3" || "4" || "5" || "6" || "7" || "8" || "9"
-    private static let digits = RecursiveToken { digit + $0.opt() }
+    private static let digits = RecursivePattern { digit + $0.opt() }
     
     private static let letter = \Character.isLetter
     private static let identifier_head = letter || "_"
     private static let identifier_character = identifier_head || digit
-    private static let identifier_characters = RecursiveToken { identifier_character + $0.opt() }
+    private static let identifier_characters = RecursivePattern { identifier_character + $0.opt() }
     
-    private static let eulers_number = "e"
-    private static let pi = "π" || "pi"
+    static var grammarPattern: AnyGrammarPattern<Self> {
+        let whitespaces = RecursiveGrammarPattern { whitespace + $0.opt() }
+        let expression = SharedGrammarPattern<Self>()
+        let expression_list = RecursiveGrammarPattern { expression + (whitespaces.opt() + comma_separator + whitespaces.opt() + $0).opt() }
+        
+//        let function1 = identifier + whitespaces.opt()
+//        let function2 = left_parenthesis + whitespaces.opt() + expression_list + whitespaces.opt() + right_parenthesis
+//        let function = function1 + function2
+        
+        let parenthesized_expression = left_parenthesis + whitespaces.opt() + expression + whitespace.opt() + right_parenthesis
+        // let primary_expression = number || function || identifier || parenthesized_expression
+        let function_call = left_parenthesis + whitespaces.opt() + expression_list + whitespaces.opt() + right_parenthesis
+        let primary_expression = number || (identifier + function_call.opt()) || parenthesized_expression
+        
+        let postfix_expression = primary_expression// + postfix_operator.opt()
+        
+        let prefix_expression = prefix_operator.opt() + postfix_expression
+        
+        let binary_expression = ((postfix_operator.opt() + whitespaces + binary_operator + whitespaces) || binary_operator) + prefix_expression
+        //(binary_operator || (postfix_operator.opt() + whitespaces + binary_operator + whitespaces)) + prefix_expression
+        let binary_expressions = RecursiveGrammarPattern { binary_expression + $0.opt() } + postfix_operator.opt()
+
+        
+        expression.pattern = AnyGrammarPattern(prefix_expression + binary_expressions.opt())
+
+        return AnyGrammarPattern(whitespaces.opt() + AnyGrammarPattern(expression + whitespaces.opt()))
+    }
     
     var pattern: Pattern {
         switch self {
-        case .left_parentheses: return "("
-        case .right_parentheses: return ")"
-        case .number: return LexerEnum.digits + ("." + LexerEnum.digits).opt()
-        case .operation: return "+" || "-" || "*" || "/" || "^"
-        case .identifier: return LexerEnum.identifier_head + LexerEnum.identifier_characters.opt()
-        case .constant: return LexerEnum.eulers_number || LexerEnum.pi
-        case .whitespace: return CharacterToken(\.isWhitespace)
+        case .left_parenthesis: return "("
+        case .right_parenthesis: return ")"
+        case .number: return Self.digits + ("." + Self.digits).opt()
+        case .binary_operator: return "+" || "-" || "*" || "/" || "^"
+        case .prefix_operator: return "+" || "-"
+        case .postfix_operator: return "++" || "--"
+        case .identifier: return Self.identifier_head + Self.identifier_characters.opt()
+        case .whitespace: return \Character.isWhitespace
+        case .comma_separator: return ","
         }
     }
 }
-class Lexer {
-    @Token var left_parentheses = "("
-    @Token var right_parentheses = ")"
+
+struct Function: Hashable {
+    var identifier: String
+    var arity: UInt
+    var apply: ([Double]) -> Double
+    //TODO: Allow function of any arity
     
-    static let digit = "0" || "1" || "2" || "3" || "4" || "5" || "6" || "7" || "8" || "9"
-    static let digits = RecursiveToken { digit + $0.opt() }
+    init(_ identifier: String, arity: UInt, function: @escaping ([Double]) -> Double) {
+        self.identifier = identifier
+        self.arity = arity
+        self.apply = function
+    }
+    func evaluate(with arguments: [Double]) -> Double {
+        guard arguments.count == arity else { fatalError("The length of the arguments must be equal to the arity of the function.") }
+        return apply(arguments)
+    }
+    static func ==(lhs: Function, rhs: Function) -> Bool {
+        return lhs.arity == rhs.arity && lhs.identifier == rhs.identifier
+    }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(arity)
+        hasher.combine(identifier)
+    }
+}
+class Constant: Hashable {
+    var identifier: String
+    var value: Double
     
-    @Token var number = Lexer.digits + ("." + Lexer.digits).opt()
-    @Token var operation = "+" || "-" || "*" || "/" || "^"
+    init(_ identifier: String, value: Double) {
+        self.identifier = identifier
+        self.value = value
+    }
+    static func ==(lhs: Constant, rhs: Constant) -> Bool {
+        return lhs.identifier == rhs.identifier
+    }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(identifier)
+    }
+}
+struct PrefixOperator: Hashable {
+    var identifier: String
+    var apply: (Double) -> Double
     
-    static let letter = \Character.isLetter
-    static let identifier_head = letter || "_"
-    static let identifier_character = identifier_head || digit
-    static let identifier_characters = RecursiveToken { identifier_character + $0.opt() }
+    init(_ identifier: String, function: @escaping (Double) -> Double) {
+        self.identifier = identifier
+        self.apply = function
+    }
+    static func ==(lhs: Self, rhs: Self) -> Bool {
+        return lhs.identifier == rhs.identifier
+    }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(identifier)
+    }
+}
+struct PostfixOperator: Hashable {
+    var identifier: String
+    var apply: (Double) -> Double
     
-    @Token var identifier = Lexer.identifier_head + identifier_characters.opt()
+    init(_ identifier: String, function: @escaping (Double) -> Double) {
+        self.identifier = identifier
+        self.apply = function
+    }
+    static func ==(lhs: Self, rhs: Self) -> Bool {
+        return lhs.identifier == rhs.identifier
+    }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(identifier)
+    }
+}
+struct InfixOperator: Hashable {
+    var identifier: String
+    var associativity: Associativity = .left
+    var precedence: Double = 0
+    var apply: (Double, Double) -> Double
     
-    static let eulers_number = "e"
-    static let pi = "π" || "pi"
+    enum Associativity {
+        case left, right
+    }
     
-    @Token var constant = Lexer.eulers_number || Lexer.pi
+    init(_ identifier: String, associativity: Associativity = .left, precedence: Double = 0, function: @escaping (Double, Double) -> Double) {
+        self.identifier = identifier
+        self.associativity = associativity
+        self.precedence = precedence
+        self.apply = function
+    }
+    static func ==(lhs: Self, rhs: Self) -> Bool {
+        return lhs.identifier == rhs.identifier
+    }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(identifier)
+    }
+}
+
+final class LookupTable {
+    private(set) static var functions = Set<Function>()
+    private(set) static var constants = Set<Constant>()
+    private(set) static var infixOperators = Set<InfixOperator>()
+    private(set) static var prefixOperators = Set<PrefixOperator>()
+    private(set) static var postfixOperators = Set<PostfixOperator>()
     
-//    @Token var variable = "x"
+    static func define(function: Function) throws {
+        guard functions.insert(function).inserted else {
+            throw LookupTable.Error.conflictsWithPreviousDefinition
+        }
+    }
+    static func define(constant: Constant) throws {
+        guard constants.insert(constant).inserted else {
+            throw LookupTable.Error.conflictsWithPreviousDefinition
+        }
+    }
+    static func define(infixOperator: InfixOperator) throws {
+        guard infixOperators.insert(infixOperator).inserted else {
+            throw LookupTable.Error.conflictsWithPreviousDefinition
+        }
+    }
+    static func define(prefixOperator: PrefixOperator) throws {
+        guard prefixOperators.insert(prefixOperator).inserted else {
+            throw LookupTable.Error.conflictsWithPreviousDefinition
+        }
+    }
+    static func define(postfixOperator: PostfixOperator) throws {
+        guard postfixOperators.insert(postfixOperator).inserted else {
+            throw LookupTable.Error.conflictsWithPreviousDefinition
+        }
+    }
     
-    @Token var whitespace = CharacterToken(\.isWhitespace)
-    internal init () {
-        
+    static func lookupPrefixOperator(identifier: String) throws -> PrefixOperator {
+        guard let op = prefixOperators.first(where: { $0.identifier == identifier }) else {
+            throw Error.undefinedPrefixOperator
+        }
+        return op
+    }
+    static func lookupPostfixOperator(identifier: String) throws -> PostfixOperator {
+        guard let op = postfixOperators.first(where: { $0.identifier == identifier }) else {
+            throw Error.undefinedPostfixOperator
+        }
+        return op
+    }
+    static func lookupInfixOperator(identifier: String) throws -> InfixOperator {
+        guard let op = infixOperators.first(where: { $0.identifier == identifier }) else {
+            throw Error.undefinedInfixOperator
+        }
+        return op
+    }
+    static func lookupConstant(identifier: String) throws -> Constant {
+        guard let constant = constants.first(where: { $0.identifier == identifier }) else {
+            throw Error.undefinedConstant
+        }
+        return constant
+    }
+    static func lookupFunction(identifier: String, arity: UInt) throws -> Function {
+        guard let function = functions.first(where: { $0.identifier == identifier && $0.arity == arity }) else {
+            throw Error.undefinedFunction
+        }
+        return function
+    }
+    static func lookupFunctions(identifier: String) throws -> [Function] {
+        let matchingFunctions = functions.filter { $0.identifier == identifier }
+        guard !matchingFunctions.isEmpty else {
+            throw Error.undefinedFunction
+        }
+        return matchingFunctions.sorted { $0.arity < $1.arity }
+    }
+    
+    static func updateConstant(withIdentifier identifier: String, to newValue: Double) throws {
+        guard let constant = constants.first(where: { $0.identifier == identifier }) else {
+            throw Error.undefinedConstant
+        }
+        constant.value = newValue
     }
     
     enum Error: Swift.Error {
-        case cannotMatchToken(source: String, position: String.Index)
+        case conflictsWithPreviousDefinition
+        case undefinedPrefixOperator
+        case undefinedInfixOperator
+        case undefinedPostfixOperator
+        case undefinedConstant
+        case undefinedFunction
+        case value
+    }
+}
+
+try LookupTable.define(infixOperator: .init("+", precedence: 0) { $0 + $1 })
+try LookupTable.define(infixOperator: .init("-", precedence: 0) { $0 - $1 })
+try LookupTable.define(infixOperator: .init("*", precedence: 100) { $0 * $1 })
+try LookupTable.define(infixOperator: .init("/", precedence: 100) { $0 / $1 })
+try LookupTable.define(infixOperator: .init("^", associativity: .right, precedence: 200, function: pow))
+
+try LookupTable.define(prefixOperator: .init("-") { -$0 })
+try LookupTable.define(prefixOperator: .init("+") { $0 })
+
+try LookupTable.define(constant: .init("pi", value: .pi))
+try LookupTable.define(constant: .init("π", value: .pi))
+try LookupTable.define(constant: .init("e", value: M_E))
+
+try LookupTable.define(function: .init("cos", arity: 1) { cos($0[0]) })
+try LookupTable.define(function: .init("sin", arity: 1) { sin($0[0]) })
+try LookupTable.define(function: .init("tan", arity: 1) { tan($0[0]) })
+try LookupTable.define(function: .init("acos", arity: 1) { acos($0[0]) })
+try LookupTable.define(function: .init("asin", arity: 1) { asin($0[0]) })
+try LookupTable.define(function: .init("atan", arity: 1) { atan($0[0]) })
+try LookupTable.define(function: .init("sqrt", arity: 1) { sqrt($0[0]) })
+try LookupTable.define(function: .init("cbrt", arity: 1) { cbrt($0[0]) })
+try LookupTable.define(function: .init("log", arity: 1) { log10($0[0]) })
+try LookupTable.define(function: .init("log2", arity: 1) { log2($0[0]) })
+try LookupTable.define(function: .init("ln", arity: 1) { log($0[0]) })
+
+
+enum Expression {
+    indirect case infixOperator(InfixOperator, lhs: Self, rhs: Self)
+    indirect case postfixOperator(PostfixOperator, Self)
+    indirect case prefixOperator(PrefixOperator, Self)
+    indirect case function(Function, arguments: [Self])
+    case constant(Constant)
+    case number(Double)
+    
+    static let zero: Self = .number(.zero)
+    
+    func evaluated() -> Double {
+        switch self {
+        case let .infixOperator(op, lhs: lhs, rhs: rhs):
+            return op.apply(lhs.evaluated(), rhs.evaluated())
+        case let .prefixOperator(op, exp):
+            return op.apply(exp.evaluated())
+        case let .postfixOperator(op, exp):
+            return op.apply(exp.evaluated())
+        case let .function(function, arguments: args):
+            return function.apply(args.map { $0.evaluated() })
+        case let .constant(constant):
+            return constant.value
+        case let .number(n):
+            return n
+        }
+    }
+}
+
+typealias Token = MatchedToken<TokenClassification>
+
+enum SemaError: Error {
+    case infixOperatorSpacing
+    case invalidSpacing
+    case invalidOperator
+    case invalidSeparator
+    case functionDoesNotExist(identifier: String, arity: Int? = nil)
+    case missingTokens
+    case functionDoesNotTerminate(identifier: String)
+    case constantDoesNotExist(identifier: String)
+    case invalidToken(Token, output: [Token], stack: [Token], idx: Array<Token>.Index)
+    case unbalancedParentheses
+}
+
+// Puts the tokens into postfix notation
+func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAndFunctions: [Either<Constant, Function>]) {
+    var stack = [Token]()
+    var output = [Token]()
+    let tokens = tokens.filter { $0.classification != .whitespace }
+    var idx = tokens.startIndex
+    var constantsAndFunctions = [Either<Constant, Function>]()
+//    var leftParensCount = 0
+//    var rightParensCount = 0
+
+    while idx < tokens.endIndex {
+//        let lastToken = idx - 1 >= tokens.startIndex ? tokens[idx - 1] : nil
+        let token = tokens[idx]
+        let nextToken = idx + 1 < tokens.endIndex ? tokens[idx + 1] : nil
         
-        var localizedDescription: String {
-            switch self {
-            case let .cannotMatchToken(source, position):
-                let positionOffset = source.distance(from: source.startIndex, to: position)
-                var errorMessage = "error: tokenization failed; could not match any tokens to the string at a position."
-                errorMessage += "\n\t" + source
-                errorMessage += "\n\t" + String(repeating: " ", count: positionOffset) + "^"
-                return errorMessage
-            }
-        }
-    }
-    
-    static var availableTokens: [LabelledToken] {
-        let lexer = Lexer()
-        let mirror = Mirror(reflecting: lexer)
-        let children = mirror.children
-        var arr = [LabelledToken]()
-        for child in children {
-            print(child.value)
-            guard let token = child.value as? Token else {
-                continue
-            }
-            guard let label = child.label, label.hasPrefix("_") else {
-                fatalError("Child either does not have a label or its underlying name isn't prefixed with an underscore.")
-            }
-            arr.append(LabelledToken(label: "\(label.dropFirst())", pattern: token.pattern))
-        }
-        return arr
-    }
-    
-    static func tokenize(_ input: String) throws -> [MatchedToken] {
-        let tokens = availableTokens
-        var substr = input[...]
-        var matchedTokens = [MatchedToken]()
-        // Attempts to consume tokens until substr is empty, at which point the whole input has been tokenized
-        searchLoop: while !substr.isEmpty {
-            // Tries to consume each token from the start of substr
-            for token in tokens {
-                if let consumedString = try? token.pattern.consumeNextToken(from: substr) {
-                    let matchedToken = MatchedToken(
-                        label: token.label,
-                        pattern: token.pattern,
-                        match: substr[..<consumedString.startIndex]
-                    )
-                    substr = consumedString
-                    matchedTokens.append(matchedToken)
-                    continue searchLoop
+        mainTokenClassification:
+        switch token.classification {
+        
+        case .whitespace:
+            break
+            
+        case .comma_separator:
+            throw SemaError.invalidSeparator
+            
+        case .number:
+            output.append(token)
+            if nextToken?.classification != .postfix_operator {
+                while stack.last?.classification == .prefix_operator {
+                    output.append(stack.removeLast())
                 }
             }
-            let failureIndex = substr.startIndex
-            throw Lexer.Error.cannotMatchToken(source: input, position: failureIndex)
+            
+            
+        case .left_parenthesis:
+            stack.append(token)
+            
+        case .prefix_operator:
+            stack.append(token)
+            
+        case .binary_operator:
+            guard let currentOpertor = try? LookupTable.lookupInfixOperator(identifier: String(token.match)) else {
+                throw SemaError.invalidOperator
+            }
+            while let operatorToken = stack.last, operatorToken.classification == .binary_operator, let op = try? LookupTable.lookupInfixOperator(identifier: String(operatorToken.match)), op.precedence > currentOpertor.precedence {
+                stack.removeLast()
+                output.append(operatorToken)
+            }
+            stack.append(token)
+            
+        case .postfix_operator:
+            output.append(Token(classification: .postfix_operator, match: token.match))
+            if nextToken?.classification != .postfix_operator {
+                while stack.last?.classification == .prefix_operator {
+                    output.append(stack.removeLast())
+                }
+            }
+            
+        // Matches functions
+        case .identifier where nextToken?.classification == .left_parenthesis:
+            let identifier = String(token.match)
+            guard let functions = try? LookupTable.lookupFunctions(identifier: identifier) else {
+                throw SemaError.functionDoesNotExist(identifier: identifier)
+            }
+            var depth = 1
+            // Ensure there are tokens after the left parentheses
+            guard idx + 2 < tokens.endIndex else {
+                throw SemaError.missingTokens
+            }
+            var arguments = [[Token]]()
+            var currentArgument = [Token]()
+            
+            for (i, currentToken) in tokens[(idx + 2)...].enumerated() {
+                switch currentToken.classification {
+                case .left_parenthesis:
+                    depth += 1
+                    currentArgument.append(currentToken)
+                    
+                case .right_parenthesis where depth == 1:
+                    // Adds to the output the function in postfix notation
+                    let argument = try postfixTokens(from: currentArgument)
+                    constantsAndFunctions.append(contentsOf: argument.constantsAndFunctions)
+                    arguments.append(argument.tokens)
+                    output.append(contentsOf: arguments.flatMap { $0 })
+                    output.append(token)
+                    guard let function = functions.first(where: { $0.arity == arguments.count }) else {
+                        throw SemaError.functionDoesNotExist(identifier: identifier, arity: arguments.count)
+                    }
+                    constantsAndFunctions.append(.right(function))
+                    idx += 2 + i
+                    if idx + 1 < tokens.endIndex, tokens[idx + 1].classification != .postfix_operator {
+                        while stack.last?.classification == .prefix_operator {
+                            output.append(stack.removeLast())
+                        }
+                    }
+                    break mainTokenClassification
+
+                case .right_parenthesis:
+                    depth -= 1
+                    currentArgument.append(currentToken)
+                    
+                case .comma_separator where depth == 1:
+                    let argument = try postfixTokens(from: currentArgument)
+                    arguments.append(argument.tokens)
+                    constantsAndFunctions.append(contentsOf: argument.constantsAndFunctions)
+                    currentArgument.removeAll()
+                    
+                default:
+                    currentArgument.append(currentToken)
+                }
+            }
+            
+            throw SemaError.functionDoesNotTerminate(identifier: identifier)
+            
+        case .identifier:
+            let identifier = String(token.match)
+            guard let constant = try? LookupTable.lookupConstant(identifier: identifier) else {
+                throw SemaError.constantDoesNotExist(identifier: identifier)
+            }
+            output.append(token)
+            constantsAndFunctions.append(.left(constant))
+            if nextToken?.classification != .postfix_operator {
+                while stack.last?.classification == .prefix_operator {
+                    output.append(stack.removeLast())
+                }
+            }
+        
+        case .right_parenthesis:
+            for stackToken in stack.reversed() {
+                if stackToken.classification == .left_parenthesis {
+                    stack.removeLast()
+                    if nextToken?.classification != .postfix_operator {
+                        while stack.last?.classification == .prefix_operator {
+                            output.append(stack.removeLast())
+                        }
+                    }
+                    break mainTokenClassification
+                }
+                output.append(stackToken)
+            }
+            throw SemaError.unbalancedParentheses
+            
         }
-        return matchedTokens
+        
+        // Increment token index
+        idx += 1
+
+    }
+    while !stack.isEmpty {
+        output.append(stack.removeLast())
+    }
+    return (tokens: output, constantsAndFunctions)
+}
+
+public enum Either<A, B> {
+    case left(A)
+    case right(B)
+}
+
+func createAST(from postfixData: (tokens: [Token], constantsAndFunctions: [Either<Constant, Function>])) throws -> Expression {
+    let (tokens, constantsAndFunctions) = postfixData
+    guard let lastToken = tokens.last else {
+        fatalError()
+    }
+    guard tokens.count > 1 else {
+        let match = String(lastToken.match)
+        switch lastToken.classification {
+        case .identifier:
+            guard case let .left(constant) = constantsAndFunctions.first!, constant.identifier == match else {
+                fatalError()
+            }
+            return .constant(constant)
+        case .number:
+            return .number(Double(match)!)
+        default:
+            fatalError("Invalid token for single token expression.")
+        }
+    }
+    
+    var identifierIterator = constantsAndFunctions.makeIterator()
+    var arr = [Either<Expression, Token>]()
+    arr = tokens.map { .right($0) }
+    var i = 0
+    while i != arr.endIndex {
+        guard case let .right(element) = arr[i] else { fatalError() }
+        let match = String(element.match)
+        switch element.classification {
+        case .left_parenthesis, .right_parenthesis, .whitespace, .comma_separator:
+            fatalError("This token should")
+        case .number:
+            arr[i] = .left(.number(Double(match)!))
+            i += 1
+        case .binary_operator:
+            guard i >= 2, case let .left(lhs) = arr[i - 1], case let .left(rhs) = arr[i - 2] else {
+                fatalError("Invalid binary operator token position.")
+            }
+            let infixOperator = try LookupTable.lookupInfixOperator(identifier: match)
+            arr[(i - 2)...i] = [.left(.infixOperator(infixOperator, lhs: rhs, rhs: lhs))]
+            i -= 1
+            
+        case .prefix_operator:
+            guard i >= 1, case let .left(expression) = arr[i - 1] else {
+                fatalError("Invalid prefix operator token position.")
+            }
+            let prefixOperator = try LookupTable.lookupPrefixOperator(identifier: match)
+            arr[(i - 1)...i] = [.left(.prefixOperator(prefixOperator, expression))]
+            
+        case .postfix_operator:
+            guard i >= 1, case let .left(expression) = arr[i - 1] else {
+                fatalError("Invalid postfix operator token position.")
+            }
+            let postfixOperator = try LookupTable.lookupPostfixOperator(identifier: match)
+            arr[(i - 1)...i] = [.left(.postfixOperator(postfixOperator, expression))]
+            
+        case .identifier:
+            guard let identifier = identifierIterator.next() else {
+                fatalError()
+            }
+            // If this is true, the identifier is a constant
+            switch identifier {
+            case let .left(constant):
+                guard constant.identifier == match else { fatalError() }
+                arr[i] = .left(.constant(constant))
+                i += 1
+            case let .right(function):
+                guard function.identifier == match else { fatalError() }
+                let arguments = arr[(i - Int(function.arity))..<i].map { element -> Expression in
+                    guard case let .left(expression) = element else { fatalError() }
+                    return expression
+                }
+                arr[(i - Int(function.arity))...i] = [.left(.function(function, arguments: arguments))]
+                i -= Int(function.arity)
+                i += 1
+            }
+        }
+        
+    }
+    guard arr.count == 1, case let .left(expression) = arr[0] else { fatalError() }
+    return expression
+    
+    // Crash if token type is a parentheses
+}
+
+extension Expression {
+    init(_ string: String) throws {
+        do {
+            let tokenizer = Tokenizer(using: TokenClassification.self)
+            let tokens = try tokenizer.tokenize(string)
+            let output = try postfixTokens(from: tokens)
+            let expression = try createAST(from: output)
+            self = expression
+        } catch let error as ParseError {
+            print(error.localizedDescription)
+            fatalError("Could not parse string to `Expression`.")
+        } catch {
+            fatalError("Could not parse string to `Expression`.")
+        }
     }
 }
-//let mirror = Mirror(reflecting: Lexer())
-//
-//print(mirror.displayStyle)
-//
-//
-//for child in mirror.children {
-//    guard child.value is Token else { continue }
-//    print("Property name:", child.label)
-//    print("Property value:", child.value)
-//}
-//
-//let children = mirror.children
-//let tokens = children
-//    .filter { $0.value is Token }
-//    .map { (label: $0.label!.dropFirst(), pattern: ($0.value as! Token).pattern) }
-//let str = "(isdoif"
-//let consumingTokens = tokens.filter { token in
-//    if let substr = try? token.pattern.consumeNextToken(from: str) {
-//        return true
-//    } else {
-//        return false
-//    }
-//}
-//
-//consumingTokens.forEach {
-//    print($0.label + ":", $0.pattern)
-//}
 
-Lexer.availableTokens.forEach {
-    print($0.label + ":", $0.pattern)
+extension Expression: CustomStringConvertible {
+    private var _description: String {
+        switch self {
+        case let .infixOperator(infixOperator, lhs, rhs):
+            return "(\(lhs._description) \(infixOperator.identifier) \(rhs._description))"
+            
+        case let .postfixOperator(postfixOperator, expression):
+            return expression._description + postfixOperator.identifier//"(" + expression._description + postfixOperator.identifier + ")"
+            
+        case let .prefixOperator(prefixOperator, expression):
+            return prefixOperator.identifier + expression._description//"(" + prefixOperator.identifier + expression._description + ")"
+            
+        case let .function(function, arguments):
+            return function.identifier + "(" + arguments.lazy.map(\.description).joined(separator: ", ") + ")"
+            
+        case let .constant(constant):
+            return constant.identifier
+            
+        case let .number(number):
+            return "\(number)"
+        }
+    }
+    var description: String {
+        return self._description.replacingOccurrences(of: "^\\((.+)\\)$", with: "$1", options: .regularExpression)
+    }
 }
 
 
-do {
-    let tokens = try Lexer.tokenize(exp)
-    print(tokens)
-} catch let error as Lexer.Error {
-    print(error.localizedDescription)
+var exp1 = try Expression("+cos(π / 4) + 4") //"+((4) + 10 - 7) - (-64.29434) - 7 ^ 4 + cos(180 - 493 + sin(20))"
+print(exp1)
+//let tokenizer = Tokenizer(using: TokenClassification.self)
+//var tokens: [MatchedToken<TokenClassification>]
+//do {
+//    tokens = try tokenizer.tokenize(exp1)
+//    print(tokens)
+//    let output = try postfixTokens(from: tokens)
+//    tokens = output.tokens
+//    print(tokens)
+//    print(tokens.lazy.filter { $0.classification != .whitespace }.map { String($0.match) }.joined(separator: " "))
+//    let expression = try createAST(from: output)
+//    print(expression)
+//    print(expression.evaluated())
+//} catch let error as ParseError {
+//    print(error.localizedDescription)
+//    exit(0)
+//}
+print(exp1.evaluated())
+
+try LookupTable.define(constant: .init("x", value: 0))
+var exp = try Expression("x ^ 2")
+for x in 0...10 {
+    try LookupTable.updateConstant(withIdentifier: "x", to: Double(x))
+    print("\(x) ^ 2 = \(exp.evaluated())")
 }
-
-do {
-    let tokens = try LexerEnum.tokenize(exp)
-    print(tokens)
-} catch let error as Lexer.Error {
-    print(error.localizedDescription)
-}
-
-print(Mirror(reflecting: LexerEnum.left_parentheses).children.first?.label ?? String(describing: LexerEnum.left_parentheses))
-
-
-/**
- # NOTES
- 
- - After parse tree is constructed by an instance of Tokenizer, provide a SemanticAnalyzer class that can be given a set of rules to use when recursively analyzing the syntax tree
- - Consider making the provided tokens' initializers private
- - Instead of throwing errors during the semantic analysis (Sema) phase, make it return a `Result<syntax-tree, SemaError>` or something.
- - Also, the rules can return a `Result<Never, SemaError>`
- - Maybe I can make users define these patterns in a class like ArgumentParser and have `@Token` property wrappers use enclosing-self to register the tokens or reflection
- */
-
