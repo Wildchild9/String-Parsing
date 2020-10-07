@@ -385,8 +385,8 @@ import Foundation
 
 enum TokenClassification: Parsable, CaseIterable {
     typealias TokenType = Self
-    
-    
+
+
     case left_parenthesis
     case right_parenthesis
     case number
@@ -396,43 +396,44 @@ enum TokenClassification: Parsable, CaseIterable {
     case identifier
     case whitespace
     case comma_separator
-    
+
     private static let digit = "0" || "1" || "2" || "3" || "4" || "5" || "6" || "7" || "8" || "9"
     private static let digits = RecursivePattern { digit + $0.opt() }
-    
+
     private static let letter = \Character.isLetter
     private static let identifier_head = letter || "_"
     private static let identifier_character = identifier_head || digit
     private static let identifier_characters = RecursivePattern { identifier_character + $0.opt() }
-    
+
     static var grammarPattern: AnyGrammarPattern<Self> {
         let whitespaces = RecursiveGrammarPattern { whitespace + $0.opt() }
         let expression = SharedGrammarPattern<Self>()
         let expression_list = RecursiveGrammarPattern { expression + (whitespaces.opt() + comma_separator + whitespaces.opt() + $0).opt() }
-        
+
 //        let function1 = identifier + whitespaces.opt()
 //        let function2 = left_parenthesis + whitespaces.opt() + expression_list + whitespaces.opt() + right_parenthesis
 //        let function = function1 + function2
-        
+
         let parenthesized_expression = left_parenthesis + whitespaces.opt() + expression + whitespace.opt() + right_parenthesis
         // let primary_expression = number || function || identifier || parenthesized_expression
         let function_call = left_parenthesis + whitespaces.opt() + expression_list + whitespaces.opt() + right_parenthesis
         let primary_expression = number || (identifier + function_call.opt()) || parenthesized_expression
-        
-        let postfix_expression = primary_expression// + postfix_operator.opt()
-        
-        let prefix_expression = prefix_operator.opt() + postfix_expression
-        
-        let binary_expression = ((postfix_operator.opt() + whitespaces + binary_operator + whitespaces) || binary_operator) + prefix_expression
+
+//        let postfix_expression = primary_expression //+ postfix_operator.opt()
+
+        let prefix_expression = prefix_operator.opt() + primary_expression //postfix_expression
+
+        let spaced_binary_operator = whitespaces + binary_operator + whitespaces
+        let binary_expression = (postfix_operator.opt() + spaced_binary_operator + prefix_expression) || (binary_operator + primary_expression)
+//        let binary_expression = ((postfix_operator.opt() + whitespaces + binary_operator + whitespaces) || binary_operator) + prefix_expression
         //(binary_operator || (postfix_operator.opt() + whitespaces + binary_operator + whitespaces)) + prefix_expression
-        let binary_expressions = RecursiveGrammarPattern { binary_expression + $0.opt() } + postfix_operator.opt()
+        let binary_expressions = RecursiveGrammarPattern { binary_expression + $0.opt() }
 
-        
-        expression.pattern = AnyGrammarPattern(prefix_expression + binary_expressions.opt())
+        expression.pattern = AnyGrammarPattern(AnyGrammarPattern(prefix_expression + binary_expressions.opt()) + postfix_operator.opt())
 
-        return AnyGrammarPattern(whitespaces.opt() + AnyGrammarPattern(expression + whitespaces.opt()))
+        return AnyGrammarPattern(AnyGrammarPattern(whitespaces.opt() + expression) + whitespaces.opt())
     }
-    
+
     var pattern: Pattern {
         switch self {
         case .left_parenthesis: return "("
@@ -453,7 +454,7 @@ struct Function: Hashable {
     var arity: UInt
     var apply: ([Double]) -> Double
     //TODO: Allow function of any arity
-    
+
     init(_ identifier: String, arity: UInt, function: @escaping ([Double]) -> Double) {
         self.identifier = identifier
         self.arity = arity
@@ -474,7 +475,7 @@ struct Function: Hashable {
 class Constant: Hashable {
     var identifier: String
     var value: Double
-    
+
     init(_ identifier: String, value: Double) {
         self.identifier = identifier
         self.value = value
@@ -489,7 +490,7 @@ class Constant: Hashable {
 struct PrefixOperator: Hashable {
     var identifier: String
     var apply: (Double) -> Double
-    
+
     init(_ identifier: String, function: @escaping (Double) -> Double) {
         self.identifier = identifier
         self.apply = function
@@ -504,7 +505,7 @@ struct PrefixOperator: Hashable {
 struct PostfixOperator: Hashable {
     var identifier: String
     var apply: (Double) -> Double
-    
+
     init(_ identifier: String, function: @escaping (Double) -> Double) {
         self.identifier = identifier
         self.apply = function
@@ -521,11 +522,11 @@ struct InfixOperator: Hashable {
     var associativity: Associativity = .left
     var precedence: Double = 0
     var apply: (Double, Double) -> Double
-    
+
     enum Associativity {
         case left, right
     }
-    
+
     init(_ identifier: String, associativity: Associativity = .left, precedence: Double = 0, function: @escaping (Double, Double) -> Double) {
         self.identifier = identifier
         self.associativity = associativity
@@ -546,7 +547,7 @@ final class LookupTable {
     private(set) static var infixOperators = Set<InfixOperator>()
     private(set) static var prefixOperators = Set<PrefixOperator>()
     private(set) static var postfixOperators = Set<PostfixOperator>()
-    
+
     static func define(function: Function) throws {
         guard functions.insert(function).inserted else {
             throw LookupTable.Error.conflictsWithPreviousDefinition
@@ -572,7 +573,7 @@ final class LookupTable {
             throw LookupTable.Error.conflictsWithPreviousDefinition
         }
     }
-    
+
     static func lookupPrefixOperator(identifier: String) throws -> PrefixOperator {
         guard let op = prefixOperators.first(where: { $0.identifier == identifier }) else {
             throw Error.undefinedPrefixOperator
@@ -610,14 +611,14 @@ final class LookupTable {
         }
         return matchingFunctions.sorted { $0.arity < $1.arity }
     }
-    
+
     static func updateConstant(withIdentifier identifier: String, to newValue: Double) throws {
         guard let constant = constants.first(where: { $0.identifier == identifier }) else {
             throw Error.undefinedConstant
         }
         constant.value = newValue
     }
-    
+
     enum Error: Swift.Error {
         case conflictsWithPreviousDefinition
         case undefinedPrefixOperator
@@ -653,6 +654,7 @@ try LookupTable.define(function: .init("cbrt", arity: 1) { cbrt($0[0]) })
 try LookupTable.define(function: .init("log", arity: 1) { log10($0[0]) })
 try LookupTable.define(function: .init("log2", arity: 1) { log2($0[0]) })
 try LookupTable.define(function: .init("ln", arity: 1) { log($0[0]) })
+try LookupTable.define(function: .init("exp", arity: 1) { Darwin.exp($0[0]) })
 
 
 enum Expression {
@@ -662,9 +664,9 @@ enum Expression {
     indirect case function(Function, arguments: [Self])
     case constant(Constant)
     case number(Double)
-    
+
     static let zero: Self = .number(.zero)
-    
+
     func evaluated() -> Double {
         switch self {
         case let .infixOperator(op, lhs: lhs, rhs: rhs):
@@ -712,16 +714,16 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
 //        let lastToken = idx - 1 >= tokens.startIndex ? tokens[idx - 1] : nil
         let token = tokens[idx]
         let nextToken = idx + 1 < tokens.endIndex ? tokens[idx + 1] : nil
-        
+
         mainTokenClassification:
         switch token.classification {
-        
+
         case .whitespace:
             break
-            
+
         case .comma_separator:
             throw SemaError.invalidSeparator
-            
+
         case .number:
             output.append(token)
             if nextToken?.classification != .postfix_operator {
@@ -729,14 +731,14 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
                     output.append(stack.removeLast())
                 }
             }
-            
-            
+
+
         case .left_parenthesis:
             stack.append(token)
-            
+
         case .prefix_operator:
             stack.append(token)
-            
+
         case .binary_operator:
             guard let currentOpertor = try? LookupTable.lookupInfixOperator(identifier: String(token.match)) else {
                 throw SemaError.invalidOperator
@@ -746,7 +748,7 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
                 output.append(operatorToken)
             }
             stack.append(token)
-            
+
         case .postfix_operator:
             output.append(Token(classification: .postfix_operator, match: token.match))
             if nextToken?.classification != .postfix_operator {
@@ -754,7 +756,7 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
                     output.append(stack.removeLast())
                 }
             }
-            
+
         // Matches functions
         case .identifier where nextToken?.classification == .left_parenthesis:
             let identifier = String(token.match)
@@ -768,13 +770,13 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
             }
             var arguments = [[Token]]()
             var currentArgument = [Token]()
-            
+
             for (i, currentToken) in tokens[(idx + 2)...].enumerated() {
                 switch currentToken.classification {
                 case .left_parenthesis:
                     depth += 1
                     currentArgument.append(currentToken)
-                    
+
                 case .right_parenthesis where depth == 1:
                     // Adds to the output the function in postfix notation
                     let argument = try postfixTokens(from: currentArgument)
@@ -797,20 +799,20 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
                 case .right_parenthesis:
                     depth -= 1
                     currentArgument.append(currentToken)
-                    
+
                 case .comma_separator where depth == 1:
                     let argument = try postfixTokens(from: currentArgument)
                     arguments.append(argument.tokens)
                     constantsAndFunctions.append(contentsOf: argument.constantsAndFunctions)
                     currentArgument.removeAll()
-                    
+
                 default:
                     currentArgument.append(currentToken)
                 }
             }
-            
+
             throw SemaError.functionDoesNotTerminate(identifier: identifier)
-            
+
         case .identifier:
             let identifier = String(token.match)
             guard let constant = try? LookupTable.lookupConstant(identifier: identifier) else {
@@ -823,7 +825,7 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
                     output.append(stack.removeLast())
                 }
             }
-        
+
         case .right_parenthesis:
             for stackToken in stack.reversed() {
                 if stackToken.classification == .left_parenthesis {
@@ -838,9 +840,9 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
                 output.append(stackToken)
             }
             throw SemaError.unbalancedParentheses
-            
+
         }
-        
+
         // Increment token index
         idx += 1
 
@@ -875,7 +877,7 @@ func createAST(from postfixData: (tokens: [Token], constantsAndFunctions: [Eithe
             fatalError("Invalid token for single token expression.")
         }
     }
-    
+
     var identifierIterator = constantsAndFunctions.makeIterator()
     var arr = [Either<Expression, Token>]()
     arr = tokens.map { .right($0) }
@@ -896,21 +898,21 @@ func createAST(from postfixData: (tokens: [Token], constantsAndFunctions: [Eithe
             let infixOperator = try LookupTable.lookupInfixOperator(identifier: match)
             arr[(i - 2)...i] = [.left(.infixOperator(infixOperator, lhs: rhs, rhs: lhs))]
             i -= 1
-            
+
         case .prefix_operator:
             guard i >= 1, case let .left(expression) = arr[i - 1] else {
                 fatalError("Invalid prefix operator token position.")
             }
             let prefixOperator = try LookupTable.lookupPrefixOperator(identifier: match)
             arr[(i - 1)...i] = [.left(.prefixOperator(prefixOperator, expression))]
-            
+
         case .postfix_operator:
             guard i >= 1, case let .left(expression) = arr[i - 1] else {
                 fatalError("Invalid postfix operator token position.")
             }
             let postfixOperator = try LookupTable.lookupPostfixOperator(identifier: match)
             arr[(i - 1)...i] = [.left(.postfixOperator(postfixOperator, expression))]
-            
+
         case .identifier:
             guard let identifier = identifierIterator.next() else {
                 fatalError()
@@ -932,11 +934,11 @@ func createAST(from postfixData: (tokens: [Token], constantsAndFunctions: [Eithe
                 i += 1
             }
         }
-        
+
     }
     guard arr.count == 1, case let .left(expression) = arr[0] else { fatalError() }
     return expression
-    
+
     // Crash if token type is a parentheses
 }
 
@@ -962,19 +964,19 @@ extension Expression: CustomStringConvertible {
         switch self {
         case let .infixOperator(infixOperator, lhs, rhs):
             return "(\(lhs._description) \(infixOperator.identifier) \(rhs._description))"
-            
+
         case let .postfixOperator(postfixOperator, expression):
             return expression._description + postfixOperator.identifier//"(" + expression._description + postfixOperator.identifier + ")"
-            
+
         case let .prefixOperator(prefixOperator, expression):
             return prefixOperator.identifier + expression._description//"(" + prefixOperator.identifier + expression._description + ")"
-            
+
         case let .function(function, arguments):
             return function.identifier + "(" + arguments.lazy.map(\.description).joined(separator: ", ") + ")"
-            
+
         case let .constant(constant):
             return constant.identifier
-            
+
         case let .number(number):
             return "\(number)"
         }
@@ -1011,3 +1013,132 @@ for x in 0...10 {
     try LookupTable.updateConstant(withIdentifier: "x", to: Double(x))
     print("\(x) ^ 2 = \(exp.evaluated())")
 }
+
+try LookupTable.define(postfixOperator: .init("--") { $0 - 1 })
+
+var exp3 = try Expression("cos(0)-- + 3")
+print(exp3.evaluated())
+postfix operator --
+postfix func --(value: Int) -> Int {
+    return value - 1
+}
+
+
+
+//enum ChemToken: Parsable, CaseIterable {
+//
+//    typealias TokenType = ChemToken
+//    case number
+//    case element
+//    case left_parenthesis
+//    case right_parenthesis
+//    case arrow
+//    case whitespace
+//    case plus
+//
+//    private static let digits = RegexPattern("\\d+")
+//    private static let uppercase_letter = RegexPattern("[A-Z]")
+//    private static let lowercase_letter = RegexPattern("[a-z]")
+//
+//    var pattern: Pattern {
+//        switch self {
+//        case .number:
+//            return Self.digits
+//        case .element:
+//            return Self.uppercase_letter + Self.lowercase_letter.opt()
+//        case .left_parenthesis:
+//            return "("
+//        case .right_parenthesis:
+//            return ")"
+//        case .arrow:
+//            return "->" || "=>" || "→"
+//        case .whitespace:
+//            return \Character.isWhitespace
+//        case .plus:
+//            return "+"
+//        }
+//    }
+//
+//    static var grammarPattern: AnyGrammarPattern<ChemToken> {
+//        let whitespaces = RecursiveGrammarPattern { whitespace + $0.opt() }
+//
+//        let numbered_element = element + number.opt()
+//        let elements = RecursiveGrammarPattern { numbered_element + $0.opt() }
+//
+//        let bracketed_molecule = left_parenthesis + numbered_element + elements + right_parenthesis + number
+//        let molecule_component = numbered_element || bracketed_molecule
+//        let molecule = RecursiveGrammarPattern { molecule_component + $0.opt() }
+//
+//        let reaction_side = RecursiveGrammarPattern { molecule + whitespaces.opt() + (plus + whitespaces.opt() + $0).opt() }
+//        let reaction = whitespaces.opt() + reaction_side + arrow + whitespaces.opt() + reaction_side
+//
+//        return AnyGrammarPattern(reaction)
+//    }
+//}
+//
+//
+//var chemicalEquation = "C2(OH)10 + O2 -> CO2 + CO + H2O"
+//var tokenizer = Tokenizer(using: ChemToken.self)
+//var tokens = [MatchedToken<ChemToken>]()
+//print(chemicalEquation)
+//do {
+//    tokens = try tokenizer.tokenize(chemicalEquation)
+//} catch let error as ParseError {
+//    print(error.localizedDescription)
+//} catch {
+//    print(error.localizedDescription)
+//}
+//
+//
+//var reactionSides = tokens.filter { $0.classification != .whitespace }.split { $0.classification == .arrow }
+//var lhsTokens = reactionSides[0]
+//var rhsTokens = reactionSides[1]
+//var reactants = lhsTokens.split { $0.classification == .plus }
+//var products = rhsTokens.split { $0.classification == .plus }
+//print(reactants.map { $0.map { String($0.match) }.joined() })
+//print(products.map { $0.map { String($0.match) }.joined() })
+//
+//print(tokens)
+
+
+enum XToken: Parsable, CaseIterable {
+    typealias TokenType = Self
+    case a
+    case b
+    case c
+    
+    static let pattern = "a" + ("b" || ("b" + "b")) + "c"
+    var pattern: Pattern {
+        switch self {
+        case .a: return "a"//Self.pattern
+        case .b: return "b"
+        case .c: return "c"
+        }
+    }
+    
+    /// #Should match:
+    ///   - `abbc`
+    ///   - `abc`
+    static var grammarPattern: AnyGrammarPattern<XToken> {
+//        let temp1 = a + b.opt()
+//        let grammar = temp1 + b + c
+        let bb = b + b
+        print(type(of: a + (b || bb) + c))
+        return AnyGrammarPattern<XToken>(a + (b || bb) + c)
+    }
+}
+
+print("\n\n")
+var str = "abc"
+print(str)
+var tokenizer = Tokenizer(using: XToken.self)
+var tokens = [MatchedToken<XToken>]()
+do {
+    tokens = try tokenizer.tokenize(str)
+    print(tokens)
+} catch let error as ParseError {
+    print(error.localizedDescription)
+} catch {
+    print(error.localizedDescription)
+}
+

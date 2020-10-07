@@ -26,12 +26,26 @@ extension Parsable where Self: CaseIterable {
 ////}
 //
 extension Parsable {
-    func consuming<T>(input: T) -> (tokens: [MatchedToken<TokenType>], remaining: Substring)? where T : StringProtocol, T.SubSequence == Substring {
-        if let remaining = pattern.consumed(from: input) {
-            return (tokens: [MatchedToken(classification: self, match: input[input.startIndex..<remaining.startIndex])], remaining: remaining)
+    func consuming<T>(input: T) -> (tokens: [MatchedToken<TokenType>], remaining: Substring, returnPoint: GrammarReturnPoint<TokenType>?)? where T : StringProtocol, T.SubSequence == Substring {
+        guard let remaining = pattern.consumed(from: input) else {
+            return nil
         }
-        return nil
+        return (tokens: [MatchedToken(classification: self, match: input[input.startIndex..<remaining.startIndex])], remaining: remaining, returnPoint: nil)
     }
+    
+//    func consuming<T>(input: T) -> [(tokens: [MatchedToken<TokenType>], remaining: Substring)] where T : StringProtocol, T.SubSequence == Substring {
+//        if let remaining = pattern.consumed(from: input) {
+//            return [(tokens: [MatchedToken(classification: self, match: input[input.startIndex..<remaining.startIndex])], remaining: remaining)]
+//        }
+//        return []
+//    }
+    
+//    func consuming<T>(input: T) -> (tokens: [MatchedToken<TokenType>], remaining: Substring)? where T : StringProtocol, T.SubSequence == Substring {
+//        if let remaining = pattern.consumed(from: input) {
+//            return (tokens: [MatchedToken(classification: self, match: input[input.startIndex..<remaining.startIndex])], remaining: remaining)
+//        }
+//        return nil
+//    }
 }
 
 
@@ -104,14 +118,47 @@ struct Tokenizer<T> where T: Parsable {
     init(using tokenSource: T.Type) { }
     
     func tokenize(_ input: String) throws -> [MatchedToken<T>] {
-        guard let output = T.grammarPattern.consuming(input: input) else {
+        
+//        let context = GrammarParsingContext<T>(input: input)
+//        let result = T.grammarPattern.parse(from: context)
+//        guard result.wasSuccessful else {
+//            throw ParseError.cannotMatchToken(source: input, position: context.furthestIndex)
+//        }
+//        return context.tokens
+        
+        guard var output = T.grammarPattern.consuming(input: input) else {
             throw ParseError.couldNotParseTokens
         }
-        if output.remaining.count > 0 {
-            print(String(output.remaining))
-            throw ParseError.cannotMatchToken(source: input, position: output.remaining.startIndex)
+        while output.remaining.count > 0 {
+            guard let returnPoint = output.returnPoint else {
+                print(String(output.remaining))
+                throw ParseError.cannotMatchToken(source: input, position: output.remaining.startIndex)
+            }
+            guard let newOutput = returnPoint.attemptConsume() else {
+                throw ParseError.couldNotParseTokens
+            }
+            output = newOutput
         }
         return output.tokens
+        
+//        let outputs = T.grammarPattern.consuming(input: input)
+//        guard let firstOutput = outputs.first else {
+//            throw ParseError.couldNotParseTokens
+//        }
+//        for output in outputs where output.remaining.count == 0 {
+//            return output.tokens
+//        }
+//        print(String(firstOutput.remaining))
+//        throw ParseError.cannotMatchToken(source: input, position: firstOutput.remaining.startIndex)
+
+//        guard let output = T.grammarPattern.consuming(input: input) else {
+//            throw ParseError.couldNotParseTokens
+//        }
+//        if output.remaining.count > 0 {
+//            print(String(output.remaining))
+//            throw ParseError.cannotMatchToken(source: input, position: output.remaining.startIndex)
+//        }
+//        return output.tokens
 //        let tokenClassifications = T.availableTokens
 //        var substr = input[...]
 //        var matchedTokens = [MatchedToken<T>]()
@@ -137,6 +184,8 @@ struct Tokenizer<T> where T: Parsable {
     }
 }
 
+
+
 //MARK: - Intermediate Tokens
 struct MatchedToken<T> where T: Parsable {
     var classification: T
@@ -147,3 +196,5 @@ extension MatchedToken: CustomStringConvertible {
         return classification.label
     }
 }
+
+
