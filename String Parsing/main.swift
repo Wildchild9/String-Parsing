@@ -743,7 +743,7 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
             guard let currentOpertor = try? LookupTable.lookupInfixOperator(identifier: String(token.match)) else {
                 throw SemaError.invalidOperator
             }
-            while let operatorToken = stack.last, operatorToken.classification == .binary_operator, let op = try? LookupTable.lookupInfixOperator(identifier: String(operatorToken.match)), op.precedence > currentOpertor.precedence {
+            while let operatorToken = stack.last, operatorToken.classification == .binary_operator, let op = try? LookupTable.lookupInfixOperator(identifier: String(operatorToken.match)), op.precedence >= currentOpertor.precedence {
                 stack.removeLast()
                 output.append(operatorToken)
             }
@@ -828,8 +828,8 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
 
         case .right_parenthesis:
             for stackToken in stack.reversed() {
+                stack.removeLast()
                 if stackToken.classification == .left_parenthesis {
-                    stack.removeLast()
                     if nextToken?.classification != .postfix_operator {
                         while stack.last?.classification == .prefix_operator {
                             output.append(stack.removeLast())
@@ -986,8 +986,10 @@ extension Expression: CustomStringConvertible {
     }
 }
 
-
-var exp1 = try Expression("+cos(π / 4) + 4") //"+((4) + 10 - 7) - (-64.29434) - 7 ^ 4 + cos(180 - 493 + sin(20))"
+var expStr = "+((4) + 10 - 7) - (-64.29434) - 7 ^ 4 + cos(180 - 493 + sin(20))"
+print(expStr)
+var exp1 = try Expression(expStr)
+//var exp1 = try Expression("+cos(π / 4) + 4") //"+((4) + 10 - 7) - (-64.29434) - 7 ^ 4 + cos(180 - 493 + sin(20))"
 print(exp1)
 //let tokenizer = Tokenizer(using: TokenClassification.self)
 //var tokens: [MatchedToken<TokenClassification>]
