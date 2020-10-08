@@ -25,28 +25,43 @@ extension Parsable where Self: CaseIterable {
 ////    typealias TokenType = Self
 ////}
 //
-extension Parsable {
-    func consuming<T>(input: T) -> (tokens: [MatchedToken<TokenType>], remaining: Substring, returnPoint: GrammarReturnPoint<TokenType>?)? where T : StringProtocol, T.SubSequence == Substring {
-        guard let remaining = pattern.consumed(from: input) else {
-            return nil
-        }
-        return (tokens: [MatchedToken(classification: self, match: input[input.startIndex..<remaining.startIndex])], remaining: remaining, returnPoint: nil)
-    }
-    
-//    func consuming<T>(input: T) -> [(tokens: [MatchedToken<TokenType>], remaining: Substring)] where T : StringProtocol, T.SubSequence == Substring {
-//        if let remaining = pattern.consumed(from: input) {
-//            return [(tokens: [MatchedToken(classification: self, match: input[input.startIndex..<remaining.startIndex])], remaining: remaining)]
+//extension Parsable {
+//    
+//    func parse(from context: GrammarParsingContext<TokenType>) -> GrammarParsingResult<TokenType> {
+//        guard let remaining = pattern.consumed(from: context.input[context.currentIndex...]) else {
+//            return context.result(failure: .init(failureIndex: context.currentIndex, currentIndex: context.currentIndex))
 //        }
-//        return []
+//        let result = context.result(
+//            success: .init(
+//                consumedToken: MatchedToken(classification: self, match: context.input[context.input.startIndex..<remaining.startIndex]),
+//                currentIndex: remaining.startIndex
+//            )
+//        )
+//        
+//        context.update(with: result)
+//        return result
 //    }
-    
-//    func consuming<T>(input: T) -> (tokens: [MatchedToken<TokenType>], remaining: Substring)? where T : StringProtocol, T.SubSequence == Substring {
-//        if let remaining = pattern.consumed(from: input) {
-//            return (tokens: [MatchedToken(classification: self, match: input[input.startIndex..<remaining.startIndex])], remaining: remaining)
-//        }
-//        return nil
-//    }
-}
+////    func consuming<T>(input: T) -> (tokens: [MatchedToken<TokenType>], remaining: Substring, returnPoint: GrammarReturnPoint<TokenType>?)? where T : StringProtocol, T.SubSequence == Substring {
+////        guard let remaining = pattern.consumed(from: input) else {
+////            return nil
+////        }
+////        return (tokens: [MatchedToken(classification: self, match: input[input.startIndex..<remaining.startIndex])], remaining: remaining, returnPoint: nil)
+////    }
+//    
+////    func consuming<T>(input: T) -> [(tokens: [MatchedToken<TokenType>], remaining: Substring)] where T : StringProtocol, T.SubSequence == Substring {
+////        if let remaining = pattern.consumed(from: input) {
+////            return [(tokens: [MatchedToken(classification: self, match: input[input.startIndex..<remaining.startIndex])], remaining: remaining)]
+////        }
+////        return []
+////    }
+//    
+////    func consuming<T>(input: T) -> (tokens: [MatchedToken<TokenType>], remaining: Substring)? where T : StringProtocol, T.SubSequence == Substring {
+////        if let remaining = pattern.consumed(from: input) {
+////            return (tokens: [MatchedToken(classification: self, match: input[input.startIndex..<remaining.startIndex])], remaining: remaining)
+////        }
+////        return nil
+////    }
+//}
 
 
 //extension Parsable {
@@ -126,21 +141,27 @@ struct Tokenizer<T> where T: Parsable {
 //        }
 //        return context.tokens
         
-        guard var output = T.grammarPattern.consuming(input: input) else {
-            throw ParseError.couldNotParseTokens
-        }
-        while output.remaining.count > 0 {
-            guard let returnPoint = output.returnPoint else {
-                print(String(output.remaining))
-                throw ParseError.cannotMatchToken(source: input, position: output.remaining.startIndex)
-            }
-            guard let newOutput = returnPoint.attemptConsume() else {
-                throw ParseError.couldNotParseTokens
-            }
-            output = newOutput
-        }
-        return output.tokens
         
+        let context = GrammarParsingContext<T>(input: input)
+        guard let tokens = context.parseInput() else {
+            throw ParseError.cannotMatchToken(source: input, position: context.furthestIndex)
+        }
+        return tokens
+//        guard var output = T.grammarPattern.consuming(input: input) else {
+//            throw ParseError.couldNotParseTokens
+//        }
+//        while output.remaining.count > 0 {
+//            guard let returnPoint = output.returnPoint else {
+//                print(String(output.remaining))
+//                throw ParseError.cannotMatchToken(source: input, position: output.remaining.startIndex)
+//            }
+//            guard let newOutput = returnPoint.attemptConsume() else {
+//                throw ParseError.couldNotParseTokens
+//            }
+//            output = newOutput
+//        }
+//        return output.tokens
+//
 //        let outputs = T.grammarPattern.consuming(input: input)
 //        guard let firstOutput = outputs.first else {
 //            throw ParseError.couldNotParseTokens

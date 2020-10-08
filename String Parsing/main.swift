@@ -1103,33 +1103,66 @@ postfix func --(value: Int) -> Int {
 
 enum XToken: Parsable, CaseIterable {
     typealias TokenType = Self
+//    case a
+//    case ab
+//    case bc
+//    case bcc
+//    case ccd
+//    case cdd
+//
+//    var pattern: Pattern {
+//        switch self {
+//        case .a: return "a"
+//        case .ab: return "ab"
+//        case .bc: return "bc"
+//        case .bcc: return "bcc"
+//        case .ccd: return "ccd"
+//        case .cdd: return "cdd"
+//        }
+//    }
+//
+//    static var grammarPattern: AnyGrammarPattern<XToken> {
+//        return (a || ab) + (bc || bcc) + (ccd || cdd)
+//    }
     case a
     case b
     case c
-    
+    case d
+
     static let pattern = "a" + ("b" || ("b" + "b")) + "c"
     var pattern: Pattern {
         switch self {
         case .a: return "a"//Self.pattern
         case .b: return "b"
         case .c: return "c"
+        case .d: return "d"
         }
     }
-    
+
     /// #Should match:
     ///   - `abbc`
     ///   - `abc`
     static var grammarPattern: AnyGrammarPattern<XToken> {
 //        let temp1 = a + b.opt()
 //        let grammar = temp1 + b + c
-        let bb = b + b
-        print(type(of: a + (b || bb) + c))
-        return AnyGrammarPattern<XToken>(a + (b || bb) + c)
+//        let bb = b + b
+//        print(type(of: a + (b || bb) + c))
+//        return AnyGrammarPattern<XToken>(a + (b || bb) + c)
+        let ab = a + b
+        let bc = b + c
+        let bcc = bc + c
+        let cc = c + c
+        let ccd = cc + d
+        let cd = c + d
+        let cdd = cd + d
+        let pattern = (a || ab) + (bc || bcc) + (ccd || cdd)
+        print(str)
+        return AnyGrammarPattern<XToken>(pattern)
     }
 }
 
 print("\n\n")
-var str = "abc"
+var str = "abbcccdd"//"abccccd"
 print(str)
 var tokenizer = Tokenizer(using: XToken.self)
 var tokens = [MatchedToken<XToken>]()
