@@ -8,384 +8,8 @@
 
 import Foundation
 
-
-//TODO: Get rid of constant token in favour of identifier and derive constants in parser
-
-//let prefix_operator = "+" || "-"
-//
-//let digit = "0" || "1" || "2" || "3" || "4" || "5" || "6" || "7" || "8" || "9"
-//let digits = RecursivePattern { digit + $0.opt() }
-//
-//let number = digits + ("." + digits).opt()
-//
-//let spacing = RecursivePattern { " " + $0.opt() }
-//
-//let expression = SharedPattern()
-//let expression_list = RecursivePattern { expression || (spacing.opt() + "," + spacing.opt() + $0) }
-//
-//let binary_operator = "+" || "-" || "*" || "/" || "^"
-//let spaced_binary_operator = RecursivePattern { binary_operator || (" " + $0 + " ") }
-//
-//let lowercase_latin_character = "a" || "b" || "c" || "d" || "e" || "f" || "g" || "h" || "i" || "j" || "k" || "l" || "m" || "n" || "o" || "p" || "q" || "r" || "s" || "t" || "u" || "v" || "w" || "x" || "y" || "z"
-//let uppercase_latin_character = "A" || "B" || "C" || "D" || "E" || "F" || "G" || "H" || "I" || "J" || "K" || "L" || "M" || "N" || "O" || "P" || "Q" || "R" || "S" || "T" || "U" || "V" || "W" || "X" || "Y" || "Z"
-//let latin_character = lowercase_latin_character || uppercase_latin_character
-//
-//let identifier = RecursivePattern { latin_character + $0.opt() }
-//
-//let parenthesized_expression = "(" + spacing.opt() + expression + spacing.opt() + ")"
-//
-//let unary_function_expression =  identifier + parenthesized_expression
-//let temp1 = identifier + "(" + spacing.opt()
-//let temp2 = temp1 + expression + spacing.opt() + ","
-//let binary_function_expression = temp2 + spacing.opt() + expression + spacing.opt() + ")"
-//
-//let function_expression = unary_function_expression || binary_function_expression
-//
-//let eulers_number = "e"
-//let pi = "π" || "pi"
-//
-//let constant = prefix_operator.opt() + (eulers_number || pi)
-//
-//let primary_expression = function_expression || number || constant || parenthesized_expression
-//
-//let prefix_expression = prefix_operator.opt() + primary_expression
-//
-//let binary_expression = spaced_binary_operator + prefix_expression
-//let binary_expressions = RecursivePattern { binary_expression + $0.opt() }
-//
-//expression.pattern = prefix_expression + binary_expressions.opt()
-
-
-
-
-//protocol Token {
-//    static func consume<T>(_ str: T) -> (token: Self, consumedString: Substring)? where T: StringProtocol, T.SubSequence == Substring
-//
-//    func decomposed() -> [Token]
-//}
-//
-//extension Token {
-//
-//    func decomposed() -> [Token] {
-//        return [self]
-//    }
-//}
-//
-//
-////class Tokenizer {
-////    var topLevelToken: Token
-////    var tokenTypes: [Token.Type]
-////    func tokenize(_ str: String) -> [Token] {
-////
-////    }
-////}
-//// Decide how to handle whitespace (maybe make a separate token for whitespace and newline)
-//
-//
-//typealias Pattern = Tokenizable
-////struct TokenMatch {
-////    var pattern: Tokenizable
-////    var token: Token
-////}
-//
-//protocol EnumToken: Token, CaseIterable {
-//    var pattern: Tokenizable { get }
-//}
-//
-//extension EnumToken {
-//    static func consume<T>(_ str: T) -> (token: Self, consumedString: Substring)? where T: StringProtocol, T.SubSequence == Substring {
-//        for token in allCases {
-//            let pattern = token.pattern
-//            if let consumedStr = try? pattern.consumeNextToken(from: str) {
-//                return (token: token, consumedString: consumedStr)
-//            }
-//        }
-//        return nil
-//    }
-//}
-//
-//enum ConstantToken: EnumToken {
-//    case e
-//    case pi
-//
-//    var pattern: Pattern {
-//        switch self {
-//        case .e: return "e"
-//        case .pi: return "π" || "pi"
-//        }
-//    }
-//}
-//
-//struct NumberToken: Token {
-//    var value: Double
-//
-//    private enum Patterns {
-//        static let digit = "0" || "1" || "2" || "3" || "4" || "5" || "6" || "7" || "8" || "9"
-//        static let digits = RecursiveToken { digit + $0.opt() }
-//        static let number = digits + ("." + digits).opt()
-//    }
-//
-//    static func consume<T>(_ str: T) -> (token: Self, consumedString: Substring)? where T: StringProtocol, T.SubSequence == Substring {
-//        guard let consumedStr = try? Patterns.number.consumeNextToken(from: str) else {
-//            return nil
-//        }
-//        let matchStr = str[str.startIndex..<consumedStr.startIndex]
-//        guard let value = Double(matchStr) else {
-//            assertionFailure("A number was successfully parsed from the input as \"\(matchStr)\", but could not be converted to a Double.")
-//            return nil
-//        }
-//        return (token: NumberToken(value: value), consumedString: consumedStr)
-//    }
-//}
-//
-//enum PrefixOperatorToken: EnumToken {
-//    case positive
-//    case negative
-//
-//    var pattern: Pattern {
-//        switch self {
-//        case .positive: return "+"
-//        case .negative: return "-"
-//        }
-//    }
-//}
-//
-//enum BinaryOperatorToken: EnumToken {
-//    case addition
-//    case subtraction
-//    case multiplication
-//    case division
-//    case exponentiation
-//
-//    var pattern: Pattern {
-//        switch self {
-//        case .addition: return "+"
-//        case .subtraction: return "-"
-//        case .multiplication: return "*"
-//        case .division: return "/"
-//        case .exponentiation: return "^"
-//        }
-//    }
-//}
-//
-//struct IdentifierToken: Token {
-//    var identifier: String
-//
-//    init(_ identifier: String) {
-//        self.identifier = identifier
-//    }
-//    static func consume<T>(_ str: T) -> (token: Self, consumedString: Substring)? where T: StringProtocol, T.SubSequence == Substring {
-//        guard !str.isEmpty else { return nil }
-//        var idx = str.startIndex
-//        let firstCharacter = str[idx]
-//        // Ensure the first character is a letter
-//        guard firstCharacter.isLetter else { return nil }
-//        var identifierStr = String(firstCharacter)
-//
-//        idx = str.index(after: idx)
-//        while idx < str.endIndex {
-//            let character = str[idx]
-//            // Ensure that subsequent characters are a letter, number, or underscore
-//            guard character.isLetter || Set<Character>("0123456789_").contains(character) else {
-//                break
-//            }
-//            identifierStr.append(character)
-//            idx = str.index(after: idx)
-//        }
-//        return (token: IdentifierToken(identifierStr), consumedString: str[idx...])
-//    }
-//}
-//
-//struct FunctionToken: Token {
-//    var identifier: IdentifierToken
-//    var arguments: [[Token]]
-//
-//    var arity: Int {
-//        return arguments.count
-//    }
-//
-//    static func consume<T>(_ str: T) -> (token: Self, consumedString: Substring)? where T: StringProtocol, T.SubSequence == Substring {
-//
-//        guard let (identifier, consumedStr1) = IdentifierToken.consume(str) else {
-//            return nil
-//        }
-//        var substring = consumedStr1.drop { $0.isWhitespace }
-//        guard substring.hasPrefix("(") else { return nil }
-//        substring = substring.dropFirst()
-//
-//        var arguments = [ExpressionToken]()
-//
-//        guard let (firstArgument, consumedStr2) = ExpressionToken.consume(substring) else {
-//            return nil
-//        }
-//        substring = consumedStr2
-//        arguments.append(firstArgument)
-//
-//        substring = substring.drop { $0.isWhitespace }
-//
-//        while substring.hasPrefix(",") {
-//            substring = substring.dropFirst()
-//            substring = substring.drop { $0.isWhitespace }
-//            guard let (argument, consumedStr3) = ExpressionToken.consume(substring) else {
-//                return nil
-//            }
-//            arguments.append(argument)
-//            substring = consumedStr3
-//            substring = substring.drop { $0.isWhitespace }
-//        }
-//
-//        guard substring.hasPrefix(")") else { return nil }
-//        substring = substring.dropFirst()
-//        return (token: FunctionToken(identifier: identifier, arguments: arguments.map { $0.decomposed() }), consumedString: substring)
-//    }
-//}
-//
-//struct ParenthesizedExpressionToken: Token {
-//    var expression: [Token]
-//
-//    init(_ expression: ExpressionToken) {
-//        self.expression = expression.decomposed()
-//    }
-//
-//    static func consume<T>(_ str: T) -> (token: Self, consumedString: Substring)? where T: StringProtocol, T.SubSequence == Substring {
-//        guard str.hasPrefix("(") else { return nil }
-//        var substring = str.dropFirst()
-//
-//        substring = substring.drop { $0.isWhitespace }
-//
-//        guard let (expression, consumedStr) = ExpressionToken.consume(substring) else {
-//            return nil
-//        }
-//        substring = consumedStr
-//
-//        substring = substring.drop { $0.isWhitespace }
-//
-//        if consumedStr.hasPrefix(")") {
-//            return (token: Self(expression), consumedString: substring.dropFirst())
-//        }
-//        return nil
-//    }
-//}
-//
-//struct PrimaryExpressionToken: Token {
-//    var tokens: [Token]
-//
-//    static func consume<T>(_ str: T) -> (token: PrimaryExpressionToken, consumedString: Substring)? where T: StringProtocol, T.SubSequence == Substring {
-//        let tokenTypes: [Token.Type] = [FunctionToken.self, NumberToken.self, ConstantToken.self, ParenthesizedExpressionToken.self]
-//        for tokenType in tokenTypes {
-//            if let (token, consumedStr) = tokenType.consume(str) {
-//                return (token: PrimaryExpressionToken(tokens: [token]), consumedString: consumedStr)
-//            }
-//        }
-//       return nil
-//    }
-//
-//    func decomposed() -> [Token] {
-//        return tokens.flatMap { $0.decomposed() }
-//    }
-//}
-//
-//struct PrefixExpressionToken: Token {
-//    var prefixOperator: PrefixOperatorToken?
-//    var primaryExpression: [Token]
-//
-//    init(prefixOperator: PrefixOperatorToken? = nil, primaryExpression: PrimaryExpressionToken) {
-//        self.prefixOperator = prefixOperator
-//        self.primaryExpression = primaryExpression.decomposed()
-//    }
-//    static func consume<T>(_ str: T) -> (token: PrefixExpressionToken, consumedString: Substring)? where T : StringProtocol, T.SubSequence == Substring {
-//        var substring = str[...]
-//        var prefixOperator: PrefixOperatorToken?
-//        if let (prefixOperatorToken, consumedStr1) = PrefixOperatorToken.consume(substring) {
-//            substring = consumedStr1
-//            prefixOperator = prefixOperatorToken
-//        }
-//        guard let (primaryExpression, consumedStr2) = PrimaryExpressionToken.consume(substring) else {
-//            return nil
-//        }
-//        return (token: PrefixExpressionToken(prefixOperator: prefixOperator, primaryExpression: primaryExpression), consumedString: consumedStr2)
-//    }
-//
-//}
-//
-//struct BinaryExpressionToken: Token {
-//    var binaryOperator: BinaryOperatorToken
-//    var prefixExpression: PrefixExpressionToken
-//
-//    var tokens: [Token] {
-//        return [binaryOperator, prefixExpression]
-//    }
-//
-//    static func consume<T>(_ str: T) -> (token: BinaryExpressionToken, consumedString: Substring)? where T : StringProtocol, T.SubSequence == Substring {
-//        var leftSpacing = 0
-//        var idx = str.startIndex
-//        while idx < str.endIndex, str[idx].isWhitespace {
-//            leftSpacing += 1
-//            idx = str.index(after: idx)
-//        }
-//        var substring = str.dropFirst(leftSpacing)
-//        guard let (binaryOperator, remainingStr1) = BinaryOperatorToken.consume(substring) else {
-//            return nil
-//        }
-//        substring = remainingStr1
-//        idx = substring.startIndex
-//        for _  in 0..<leftSpacing {
-//            guard idx < str.endIndex, str[idx].isWhitespace else { return nil }
-//            idx = str.index(after: idx)
-//        }
-//        guard idx < str.endIndex, !str[idx].isWhitespace else { return nil }
-//        substring = substring.dropFirst(leftSpacing)
-//
-//        guard let (prefixExpression, remainingStr2) = PrefixExpressionToken.consume(substring) else {
-//            return nil
-//        }
-//
-//        return (token: BinaryExpressionToken(binaryOperator: binaryOperator, prefixExpression: prefixExpression), consumedString: remainingStr2)
-//    }
-//
-//    func decomposed() -> [Token] {
-//        return tokens.flatMap { $0.decomposed() }
-//    }
-//}
-//struct ExpressionToken: Token {
-//    var prefixExpression: PrefixExpressionToken
-//    var binaryExpressions: [BinaryExpressionToken]
-//
-//    var tokens: [Token] {
-//        return [prefixExpression] + binaryExpressions
-//    }
-//    static func consume<T>(_ str: T) -> (token: Self, consumedString: Substring)? where T: StringProtocol, T.SubSequence == Substring {
-//        guard let (prefixExpression, remainingStr1) = PrefixExpressionToken.consume(str) else {
-//            return nil
-//        }
-//        var substring = remainingStr1
-//        var binaryExpressions = [BinaryExpressionToken]()
-//        while let (binaryExpression, remainingStr2) = BinaryExpressionToken.consume(substring) {
-//            binaryExpressions.append(binaryExpression)
-//            substring = remainingStr2
-//        }
-//        return (token: ExpressionToken(prefixExpression: prefixExpression, binaryExpressions: binaryExpressions), consumedString: substring)
-//    }
-//
-//    func decomposed() -> [Token] {
-//        return tokens.flatMap { $0.decomposed() }
-//    }
-//}
-//
-//func tokenize(_ str: String) -> [Token] {
-//    guard let (expression, remainingStr) = ExpressionToken.consume(str), remainingStr.isEmpty else {
-//        fatalError("Could not parse input.")
-//    }
-//    return expression.decomposed()
-//}
-//
-//print(tokenize(exp))
-
-
-
 enum TokenClassification: Parsable, CaseIterable {
-    typealias TokenType = Self
-
+    typealias Base = Self
 
     case left_parenthesis
     case right_parenthesis
@@ -398,12 +22,12 @@ enum TokenClassification: Parsable, CaseIterable {
     case comma_separator
 
     private static let digit = "0" || "1" || "2" || "3" || "4" || "5" || "6" || "7" || "8" || "9"
-    private static let digits = RecursivePattern { digit + $0.opt() }
+    private static let digits = RecursiveTokenPattern { digit + $0.opt() }
 
     private static let letter = \Character.isLetter
     private static let identifier_head = letter || "_"
     private static let identifier_character = identifier_head || digit
-    private static let identifier_characters = RecursivePattern { identifier_character + $0.opt() }
+    private static let identifier_characters = RecursiveTokenPattern { identifier_character + $0.opt() }
 
     static var grammarPattern: AnyGrammarPattern<Self> {
         let whitespaces = RecursiveGrammarPattern { whitespace + $0.opt() }
@@ -434,7 +58,7 @@ enum TokenClassification: Parsable, CaseIterable {
         return AnyGrammarPattern(AnyGrammarPattern(whitespaces.opt() + expression) + whitespaces.opt())
     }
 
-    var pattern: Pattern {
+    var pattern: TokenPattern {
         switch self {
         case .left_parenthesis: return "("
         case .right_parenthesis: return ")"
@@ -453,7 +77,6 @@ struct Function: Hashable {
     var identifier: String
     var arity: UInt
     var apply: ([Double]) -> Double
-    //TODO: Allow function of any arity
 
     init(_ identifier: String, arity: UInt, function: @escaping ([Double]) -> Double) {
         self.identifier = identifier
@@ -707,11 +330,8 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
     let tokens = tokens.filter { $0.classification != .whitespace }
     var idx = tokens.startIndex
     var constantsAndFunctions = [Either<Constant, Function>]()
-//    var leftParensCount = 0
-//    var rightParensCount = 0
 
     while idx < tokens.endIndex {
-//        let lastToken = idx - 1 >= tokens.startIndex ? tokens[idx - 1] : nil
         let token = tokens[idx]
         let nextToken = idx + 1 < tokens.endIndex ? tokens[idx + 1] : nil
 
@@ -743,7 +363,7 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
             guard let currentOpertor = try? LookupTable.lookupInfixOperator(identifier: String(token.match)) else {
                 throw SemaError.invalidOperator
             }
-            while let operatorToken = stack.last, operatorToken.classification == .binary_operator, let op = try? LookupTable.lookupInfixOperator(identifier: String(operatorToken.match)), op.precedence > currentOpertor.precedence {
+            while let operatorToken = stack.last, operatorToken.classification == .binary_operator, let op = try? LookupTable.lookupInfixOperator(identifier: String(operatorToken.match)), op.precedence >= currentOpertor.precedence {
                 stack.removeLast()
                 output.append(operatorToken)
             }
@@ -828,8 +448,8 @@ func postfixTokens(from tokens: [Token]) throws -> (tokens: [Token], constantsAn
 
         case .right_parenthesis:
             for stackToken in stack.reversed() {
+                stack.removeLast()
                 if stackToken.classification == .left_parenthesis {
-                    stack.removeLast()
                     if nextToken?.classification != .postfix_operator {
                         while stack.last?.classification == .prefix_operator {
                             output.append(stack.removeLast())
@@ -887,7 +507,7 @@ func createAST(from postfixData: (tokens: [Token], constantsAndFunctions: [Eithe
         let match = String(element.match)
         switch element.classification {
         case .left_parenthesis, .right_parenthesis, .whitespace, .comma_separator:
-            fatalError("This token should")
+            fatalError("This token should not be present in this stage.")
         case .number:
             arr[i] = .left(.number(Double(match)!))
             i += 1
@@ -987,7 +607,10 @@ extension Expression: CustomStringConvertible {
 }
 
 
-var exp1 = try Expression("+cos(π / 4) + 4") //"+((4) + 10 - 7) - (-64.29434) - 7 ^ 4 + cos(180 - 493 + sin(20))"
+//var exp1 = try Expression("+cos(π / 4) + 4") //"+((4) + 10 - 7) - (-64.29434) - 7 ^ 4 + cos(180 - 493 + sin(20))"
+var expStr = "+((4) + 10 - 7) - (-64.29434) - 7 ^ 4 + cos(180 - 493 + sin(20))"
+print(expStr)
+var exp1 = try Expression(expStr)
 print(exp1)
 //let tokenizer = Tokenizer(using: TokenClassification.self)
 //var tokens: [MatchedToken<TokenClassification>]
@@ -1015,13 +638,6 @@ for x in 0...10 {
 }
 
 try LookupTable.define(postfixOperator: .init("--") { $0 - 1 })
-
-var exp3 = try Expression("cos(0)-- + 3")
-print(exp3.evaluated())
-postfix operator --
-postfix func --(value: Int) -> Int {
-    return value - 1
-}
 
 
 
@@ -1102,7 +718,7 @@ postfix func --(value: Int) -> Int {
 
 
 enum XToken: Parsable, CaseIterable {
-    typealias TokenType = Self
+    typealias Base = Self
 //    case a
 //    case ab
 //    case bc
@@ -1130,7 +746,7 @@ enum XToken: Parsable, CaseIterable {
     case d
 
     static let pattern = "a" + ("b" || ("b" + "b")) + "c"
-    var pattern: Pattern {
+    var pattern: TokenPattern {
         switch self {
         case .a: return "a"//Self.pattern
         case .b: return "b"
@@ -1155,14 +771,14 @@ enum XToken: Parsable, CaseIterable {
         let ccd = cc + d
         let cd = c + d
         let cdd = cd + d
-        let pattern = (a || ab) + (bc || bcc) + (ccd || cdd)
-        print(str)
+        let ac = a + c
+        let pattern = ab.repeating(count: 0...) + ac//(a || ab) + (bc || bcc) + (ccd || cdd)
         return AnyGrammarPattern<XToken>(pattern)
     }
 }
 
 print("\n\n")
-var str = "abbcccdd"//"abccccd"
+var str = "ababababababac"//"abbcccdd"//"abccccd"
 print(str)
 var tokenizer = Tokenizer(using: XToken.self)
 var tokens = [MatchedToken<XToken>]()
@@ -1175,3 +791,102 @@ do {
     print(error.localizedDescription)
 }
 
+
+//
+//
+//
+//protocol B: A where T == Self {
+//    static var thing: AnyA<Self> { get }
+//}
+//
+//protocol A {
+//    associatedtype T: B
+//}
+//
+//struct C<L, R>: A where L: A, R: A, L.T == R.T {
+//    var l: L
+//    var r: R
+//    typealias T = L.T
+//}
+//func +<T, U>(lhs: T, rhs: U) -> C<T, U> where T: A, U: A, T.T == U.T {
+//    return C(l: lhs, r: rhs)
+//}
+////struct D<L, R>: A where  L: A, R: A, L.T == R.T {
+////    var l: L
+////    var r: R
+////    typealias T = L.T
+////}
+////func ||<T, U>(lhs: T, rhs: U) -> D<T, U> {
+////    return D(l: lhs, r: rhs)
+////}
+//fileprivate class _AnyABoxBase<T>: A where T: B {
+//    typealias Base = T
+//}
+//fileprivate class _AnyABox<T: A>: _AnyABoxBase<T.T> {
+//    let base: T
+//    init(_ base: T) {
+//        self.base = base
+//    }
+//}
+//final class AnyA<U>: A where U: B {
+//    typealias T = U
+//    private let box: _AnyABoxBase<U>
+//
+//    init<P>(_ base: P) where P: A, P.T == U {
+//        self.box = _AnyABox(base)
+//    }
+//
+//}
+//enum Foo: B {
+//    typealias T = Self
+//    case a
+//    case b
+//    case c
+//    case d
+//
+//    static var thing: AnyA<Foo> {
+//        let temp = a + b + c
+//        return AnyA<Foo>(temp)
+////        let temp1 = a + b
+////        let temp2 = temp1 + c + d
+////        return AnyA<Foo>(temp2)
+//    }
+//}
+
+
+
+//enum Foo: CaseIterable, Parsable {
+//    typealias Base = Self
+//
+//    case m
+//    case n
+//    case o
+//
+//    var pattern: TokenPattern {
+//        switch self {
+//        case .m: return  "A" || "AB"
+//        case .n: return  "BC" || "BCC"
+//        case .o: return  "CCD" || "CDD"
+//
+//        }
+//    }
+//
+//    static var grammarPattern: AnyGrammarPattern<Foo> {
+//        let temp = m + n
+//        return AnyGrammarPattern(temp + o)
+//    }
+//}
+//
+//
+//let str = "ABCCCCD" //"ABBC"
+////"abbcccdd"//"abccccd"
+//let tokenizer = Tokenizer(using: Foo.self)
+//var tokens = [MatchedToken<Foo>]()
+//do {
+//    tokens = try tokenizer.tokenize(str)
+//    print(tokens)
+//} catch let error as ParseError {
+//    print(error.localizedDescription)
+//} catch {
+//    print(error.localizedDescription)
+//}
