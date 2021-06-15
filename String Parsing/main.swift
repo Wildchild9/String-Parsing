@@ -26,9 +26,23 @@ enum TokenClassification: Parsable, CaseIterable {
 
     private static let letter = \Character.isLetter
     private static let identifier_head = letter || "_"
-    private static let identifier_character = identifier_head || digit
+    private static let identifier_character = identifier_head || RegexTokenPattern("\\d")//digit
     private static let identifier_characters = RecursiveTokenPattern { identifier_character + $0.opt() }
 
+    var pattern: TokenPattern {
+        switch self {
+        case .left_parenthesis: return "("
+        case .right_parenthesis: return ")"
+        case .number: return RegexTokenPattern("\\d+(.\\d+)?")//Self.digits + ("." + Self.digits).opt()
+        case .binary_operator: return "+" || "-" || "*" || "/" || "^"
+        case .prefix_operator: return "+" || "-"
+        case .postfix_operator: return "++" || "--"
+        case .identifier: return Self.identifier_head + Self.identifier_characters.opt()
+        case .whitespace: return \Character.isWhitespace
+        case .comma_separator: return ","
+        }
+    }
+    
     static var grammarPattern: AnyGrammarPattern<Self> {
         let whitespaces = RecursiveGrammarPattern { whitespace + $0.opt() }
         let expression = SharedGrammarPattern<Self>()
@@ -41,7 +55,7 @@ enum TokenClassification: Parsable, CaseIterable {
         let parenthesized_expression = left_parenthesis + whitespaces.opt() + expression + whitespace.opt() + right_parenthesis
         // let primary_expression = number || function || identifier || parenthesized_expression
         let function_call = left_parenthesis + whitespaces.opt() + expression_list + whitespaces.opt() + right_parenthesis
-        let primary_expression = number || (identifier + function_call.opt()) || parenthesized_expression
+        let primary_expression = number || ((identifier + function_call.opt()) || parenthesized_expression)
 
 //        let postfix_expression = primary_expression //+ postfix_operator.opt()
 
@@ -56,20 +70,6 @@ enum TokenClassification: Parsable, CaseIterable {
         expression.pattern = AnyGrammarPattern(AnyGrammarPattern(prefix_expression + binary_expressions.opt()) + postfix_operator.opt())
 
         return AnyGrammarPattern(AnyGrammarPattern(whitespaces.opt() + expression) + whitespaces.opt())
-    }
-
-    var pattern: TokenPattern {
-        switch self {
-        case .left_parenthesis: return "("
-        case .right_parenthesis: return ")"
-        case .number: return Self.digits + ("." + Self.digits).opt()
-        case .binary_operator: return "+" || "-" || "*" || "/" || "^"
-        case .prefix_operator: return "+" || "-"
-        case .postfix_operator: return "++" || "--"
-        case .identifier: return Self.identifier_head + Self.identifier_characters.opt()
-        case .whitespace: return \Character.isWhitespace
-        case .comma_separator: return ","
-        }
     }
 }
 
@@ -265,10 +265,14 @@ try LookupTable.define(prefixOperator: .init("+") { $0 })
 try LookupTable.define(constant: .init("pi", value: .pi))
 try LookupTable.define(constant: .init("π", value: .pi))
 try LookupTable.define(constant: .init("e", value: M_E))
+try LookupTable.define(constant: .init("g", value: 9.81))
 
 try LookupTable.define(function: .init("cos", arity: 1) { cos($0[0]) })
 try LookupTable.define(function: .init("sin", arity: 1) { sin($0[0]) })
 try LookupTable.define(function: .init("tan", arity: 1) { tan($0[0]) })
+try LookupTable.define(function: .init("sec", arity: 1) { 1 / cos($0[0]) })
+try LookupTable.define(function: .init("csc", arity: 1) { 1 / sin($0[0]) })
+try LookupTable.define(function: .init("cot", arity: 1) { 1 / tan($0[0]) })
 try LookupTable.define(function: .init("acos", arity: 1) { acos($0[0]) })
 try LookupTable.define(function: .init("asin", arity: 1) { asin($0[0]) })
 try LookupTable.define(function: .init("atan", arity: 1) { atan($0[0]) })
@@ -572,9 +576,9 @@ extension Expression {
             self = expression
         } catch let error as ParseError {
             print(error.localizedDescription)
-            fatalError("Could not parse string to `Expression`.")
+            fatalError("Could not parse string to `Expression`")
         } catch {
-            fatalError("Could not parse string to `Expression`.")
+            fatalError("Could not parse string to `Expression`")
         }
     }
 }
@@ -608,29 +612,14 @@ extension Expression: CustomStringConvertible {
 
 
 //var exp1 = try Expression("+cos(π / 4) + 4") //"+((4) + 10 - 7) - (-64.29434) - 7 ^ 4 + cos(180 - 493 + sin(20))"
-var expStr = "+((4) + 10 - 7) - (-64.29434) - 7 ^ 4 + cos(180 - 493 + sin(20))"
+try LookupTable.define(constant: .init("x", value: 0))
+
+var expStr = "e ^ (5 * x) + e ^ (1 / 4 * x) + 4"//"4cos(x)+3"//"+((4) + 10 - 7) - (-64.29434) - 7 ^ 4 + cos(180 - 493 + sin(20))"
 print(expStr)
 var exp1 = try Expression(expStr)
 print(exp1)
-//let tokenizer = Tokenizer(using: TokenClassification.self)
-//var tokens: [MatchedToken<TokenClassification>]
-//do {
-//    tokens = try tokenizer.tokenize(exp1)
-//    print(tokens)
-//    let output = try postfixTokens(from: tokens)
-//    tokens = output.tokens
-//    print(tokens)
-//    print(tokens.lazy.filter { $0.classification != .whitespace }.map { String($0.match) }.joined(separator: " "))
-//    let expression = try createAST(from: output)
-//    print(expression)
-//    print(expression.evaluated())
-//} catch let error as ParseError {
-//    print(error.localizedDescription)
-//    exit(0)
-//}
 print(exp1.evaluated())
 
-try LookupTable.define(constant: .init("x", value: 0))
 var exp = try Expression("x ^ 2")
 for x in 0...10 {
     try LookupTable.updateConstant(withIdentifier: "x", to: Double(x))
@@ -717,8 +706,8 @@ try LookupTable.define(postfixOperator: .init("--") { $0 - 1 })
 //print(tokens)
 
 
-enum XToken: Parsable, CaseIterable {
-    typealias Base = Self
+//enum XToken: Parsable, CaseIterable {
+//    typealias Base = Self
 //    case a
 //    case ab
 //    case bc
@@ -726,7 +715,7 @@ enum XToken: Parsable, CaseIterable {
 //    case ccd
 //    case cdd
 //
-//    var pattern: Pattern {
+//    var pattern: TokenPattern {
 //        switch self {
 //        case .a: return "a"
 //        case .ab: return "ab"
@@ -738,150 +727,49 @@ enum XToken: Parsable, CaseIterable {
 //    }
 //
 //    static var grammarPattern: AnyGrammarPattern<XToken> {
-//        return (a || ab) + (bc || bcc) + (ccd || cdd)
+//        return AnyGrammarPattern(AnyGrammarPattern(a || ab) + AnyGrammarPattern(bc || bcc) + AnyGrammarPattern(ccd || cdd))
 //    }
-    case a
-    case b
-    case c
-    case d
-
-    static let pattern = "a" + ("b" || ("b" + "b")) + "c"
-    var pattern: TokenPattern {
-        switch self {
-        case .a: return "a"//Self.pattern
-        case .b: return "b"
-        case .c: return "c"
-        case .d: return "d"
-        }
-    }
-
-    /// #Should match:
-    ///   - `abbc`
-    ///   - `abc`
-    static var grammarPattern: AnyGrammarPattern<XToken> {
-//        let temp1 = a + b.opt()
-//        let grammar = temp1 + b + c
-//        let bb = b + b
-//        print(type(of: a + (b || bb) + c))
-//        return AnyGrammarPattern<XToken>(a + (b || bb) + c)
-        let ab = a + b
-        let bc = b + c
-        let bcc = bc + c
-        let cc = c + c
-        let ccd = cc + d
-        let cd = c + d
-        let cdd = cd + d
-        let ac = a + c
-        let pattern = ab.repeating(count: 0...) + ac//(a || ab) + (bc || bcc) + (ccd || cdd)
-        return AnyGrammarPattern<XToken>(pattern)
-    }
-}
-
-print("\n\n")
-var str = "ababababababac"//"abbcccdd"//"abccccd"
-print(str)
-var tokenizer = Tokenizer(using: XToken.self)
-var tokens = [MatchedToken<XToken>]()
-do {
-    tokens = try tokenizer.tokenize(str)
-    print(tokens)
-} catch let error as ParseError {
-    print(error.localizedDescription)
-} catch {
-    print(error.localizedDescription)
-}
-
-
-//
-//
-//
-//protocol B: A where T == Self {
-//    static var thing: AnyA<Self> { get }
+////    case a
+////    case b
+////    case c
+////    case d
+////
+////    static let pattern = "a" + ("b" || ("b" + "b")) + "c"
+////    var pattern: TokenPattern {
+////        switch self {
+////        case .a: return "a"//Self.pattern
+////        case .b: return "b"
+////        case .c: return "c"
+////        case .d: return "d"
+////        }
+////    }
+////
+////    /// #Should match:
+////    ///   - `abbc`
+////    ///   - `abc`
+////    static var grammarPattern: AnyGrammarPattern<XToken> {
+//////        let temp1 = a + b.opt()
+//////        let grammar = temp1 + b + c
+//////        let bb = b + b
+//////        print(type(of: a + (b || bb) + c))
+//////        return AnyGrammarPattern<XToken>(a + (b || bb) + c)
+////        let ab = a + b
+////        let bc = b + c
+////        let bcc = bc + c
+////        let cc = c + c
+////        let ccd = cc + d
+////        let cd = c + d
+////        let cdd = cd + d
+////        let pattern = (a || ab) + (bc || bcc) + (ccd || cdd)
+////        return AnyGrammarPattern<XToken>(pattern)
+////    }
 //}
 //
-//protocol A {
-//    associatedtype T: B
-//}
-//
-//struct C<L, R>: A where L: A, R: A, L.T == R.T {
-//    var l: L
-//    var r: R
-//    typealias T = L.T
-//}
-//func +<T, U>(lhs: T, rhs: U) -> C<T, U> where T: A, U: A, T.T == U.T {
-//    return C(l: lhs, r: rhs)
-//}
-////struct D<L, R>: A where  L: A, R: A, L.T == R.T {
-////    var l: L
-////    var r: R
-////    typealias T = L.T
-////}
-////func ||<T, U>(lhs: T, rhs: U) -> D<T, U> {
-////    return D(l: lhs, r: rhs)
-////}
-//fileprivate class _AnyABoxBase<T>: A where T: B {
-//    typealias Base = T
-//}
-//fileprivate class _AnyABox<T: A>: _AnyABoxBase<T.T> {
-//    let base: T
-//    init(_ base: T) {
-//        self.base = base
-//    }
-//}
-//final class AnyA<U>: A where U: B {
-//    typealias T = U
-//    private let box: _AnyABoxBase<U>
-//
-//    init<P>(_ base: P) where P: A, P.T == U {
-//        self.box = _AnyABox(base)
-//    }
-//
-//}
-//enum Foo: B {
-//    typealias T = Self
-//    case a
-//    case b
-//    case c
-//    case d
-//
-//    static var thing: AnyA<Foo> {
-//        let temp = a + b + c
-//        return AnyA<Foo>(temp)
-////        let temp1 = a + b
-////        let temp2 = temp1 + c + d
-////        return AnyA<Foo>(temp2)
-//    }
-//}
-
-
-
-//enum Foo: CaseIterable, Parsable {
-//    typealias Base = Self
-//
-//    case m
-//    case n
-//    case o
-//
-//    var pattern: TokenPattern {
-//        switch self {
-//        case .m: return  "A" || "AB"
-//        case .n: return  "BC" || "BCC"
-//        case .o: return  "CCD" || "CDD"
-//
-//        }
-//    }
-//
-//    static var grammarPattern: AnyGrammarPattern<Foo> {
-//        let temp = m + n
-//        return AnyGrammarPattern(temp + o)
-//    }
-//}
-//
-//
-//let str = "ABCCCCD" //"ABBC"
-////"abbcccdd"//"abccccd"
-//let tokenizer = Tokenizer(using: Foo.self)
-//var tokens = [MatchedToken<Foo>]()
+//print("\n\n")
+//var str = "abbcccdd"//"abccccd"
+//print(str)
+//var tokenizer = Tokenizer(using: XToken.self)
+//var tokens = [MatchedToken<XToken>]()
 //do {
 //    tokens = try tokenizer.tokenize(str)
 //    print(tokens)
@@ -890,3 +778,291 @@ do {
 //} catch {
 //    print(error.localizedDescription)
 //}
+
+//
+////
+////
+////
+////protocol B: A where T == Self {
+////    static var thing: AnyA<Self> { get }
+////}
+////
+////protocol A {
+////    associatedtype T: B
+////}
+////
+////struct C<L, R>: A where L: A, R: A, L.T == R.T {
+////    var l: L
+////    var r: R
+////    typealias T = L.T
+////}
+////func +<T, U>(lhs: T, rhs: U) -> C<T, U> where T: A, U: A, T.T == U.T {
+////    return C(l: lhs, r: rhs)
+////}
+//////struct D<L, R>: A where  L: A, R: A, L.T == R.T {
+//////    var l: L
+//////    var r: R
+//////    typealias T = L.T
+//////}
+//////func ||<T, U>(lhs: T, rhs: U) -> D<T, U> {
+//////    return D(l: lhs, r: rhs)
+//////}
+////fileprivate class _AnyABoxBase<T>: A where T: B {
+////    typealias Base = T
+////}
+////fileprivate class _AnyABox<T: A>: _AnyABoxBase<T.T> {
+////    let base: T
+////    init(_ base: T) {
+////        self.base = base
+////    }
+////}
+////final class AnyA<U>: A where U: B {
+////    typealias T = U
+////    private let box: _AnyABoxBase<U>
+////
+////    init<P>(_ base: P) where P: A, P.T == U {
+////        self.box = _AnyABox(base)
+////    }
+////
+////}
+////enum Foo: B {
+////    typealias T = Self
+////    case a
+////    case b
+////    case c
+////    case d
+////
+////    static var thing: AnyA<Foo> {
+////        let temp = a + b + c
+////        return AnyA<Foo>(temp)
+//////        let temp1 = a + b
+//////        let temp2 = temp1 + c + d
+//////        return AnyA<Foo>(temp2)
+////    }
+////}
+//
+//
+//
+////enum Foo: CaseIterable, Parsable {
+////    typealias Base = Self
+////
+////    case m
+////    case n
+////    case o
+////
+////    var pattern: TokenPattern {
+////        switch self {
+////        case .m: return  "A" || "AB"
+////        case .n: return  "BC" || "BCC"
+////        case .o: return  "CCD" || "CDD"
+////
+////        }
+////    }
+////
+////    static var grammarPattern: AnyGrammarPattern<Foo> {
+////        let temp = m + n
+////        return AnyGrammarPattern(temp + o)
+////    }
+////}
+////
+////do {
+////    let str = "ABCCCCD" //"ABBC"
+////    //"abbcccdd"//"abccccd"
+////    let tokenizer = Tokenizer(using: Foo.self)
+////    var tokens = [MatchedToken<Foo>]()
+////    do {
+////        tokens = try tokenizer.tokenize(str)
+////        print(tokens)
+////    } catch let error as ParseError {
+////        print(error.localizedDescription)
+////    } catch {
+////        print(error.localizedDescription)
+////    }
+////
+////}
+//
+////struct C<L, R> {
+////    var l: L
+////    var r: R
+////}
+////
+////func +<T, U>(lhs: T, rhs: U) -> C<T, U> {
+////    return C(l: lhs, r: rhs)
+////}
+////
+////enum Foo {
+////    case a
+////
+////    static var thing: Any {
+////        let temp = a + a + a + a // Error: Cannot convert value of type 'C<Foo, Foo>' to expected argument type 'Foo'
+////        return temp
+////    }
+////}
+//
+//
+////protocol Grammar: CaseIterable, Parsable {
+////    associatedtype Base = Self
+////}
+
+//
+//enum BaseToken: Parsable, CaseIterable {
+//    typealias Base = Self
+//
+//    case a
+//    case ab
+//    case bc
+//    case bcc
+//    case ccd
+//    case cdd
+//
+//    var pattern: TokenPattern {
+//        switch self {
+//        case .a: return "A"
+//        case .ab: return "AB"
+//        case .bc: return "BC"
+//        case .bcc: return "BCC"
+//        case .ccd: return "CCD"
+//        case .cdd: return "CDD"
+//        }
+//    }
+//
+//    static var grammarPattern: AnyGrammarPattern<BaseToken> {
+//        let temp1 = a || ab
+//        let temp2 = bc || bcc
+//        let temp3 = ccd || cdd
+//        let temp4 = temp1 + temp2
+//        let temp5 = temp4 + temp3
+//        return AnyGrammarPattern(temp5)
+//    }
+//}
+//do {
+//    //"abbcccdd"//"abccccd"
+//    let input = "ABBCCCDD"
+//    let tokenizer = Tokenizer(using: BaseToken.self)
+//    let tokens = try tokenizer.tokenize(input)
+//    print(tokens)
+//}
+
+/**
+ # Parsing Steps
+ 
+     1. Create an input string, `"ABBCCCDD"`, that will be tokenized.
+ 
+     2. Initialize a `Tokenizer<BaseToken>` instance using `Tokenizer(using:)`, passing `BaseToken.self` as the argument.
+ 
+     3. Call `tokenize(_:)` method on tokenizer instance passing in the input string to be parsed. (note that all of the steps following this one happen internally)
+ 
+     4. Initialize an instance of `GrammarParsingContext<BaseToken>`.
+ 
+     5. Call `parseInput()` method on context.
+ 
+     6. Call `parse(from:index:)` on root `+` pattern. The root pattern is shown in the diagram below.
+         ```
+                ┌──── + ────┐
+                │           │
+            ┌── + ──┐     ┌ || ┐
+            │       │     │    │
+         ┌ || ┐   ┌ || ┐ CCD  CDD
+         │    │   │    │
+         A    AB BC   BCC
+         ```
+ 
+     7. Attempt to parse first pattern, `+`, of the current `+` pattern, descending into it.
+ 
+     8. Attempt to parse first pattern, `||`, of the current `+` pattern, descending into it.
+ 
+     9. Take a snapshot of the current context.
+
+     10. Successfully parse `A` from input.
+ 
+     11. Add recovery point for right pattern, `AB`, using snapshot.
+ 
+     12. Propogate successful parsing result upwards to parent `+` pattern.
+ 
+     13. Update pattern of recovery point to `AB + (BC || BCC)`.
+ 
+     14. Attempt to parse second pattern, `||`, of the current `+` pattern, descending into it.
+ 
+     15. Attempt to parse `BC` and fail. Try to parse the right pattern next instead.
+ 
+     16. Attempt to parse `BCC` and fail.
+ 
+     17. Propogate failure upwards to parent `+` pattern.
+  
+     18. Propogate failure upwards to the parent (root) `+` pattern.
+     
+     19. Update pattern of recovery point to `(AB + (BC || BCC)) + (CCD || CDD)`.
+ 
+     20. Propogate failure upwards to initial call site, `parseInput()`.
+ 
+     21. Check for recovery points to see if we can recover parsing.
+ 
+     22. Pop the last recovery point and revert the context to it. Start parsing from the recovery point's pattern, shown below.
+        ```
+             ┌──── + ────┐
+             │           │
+         ┌── + ──┐     ┌ || ┐
+         │       │     │    │
+        AB     ┌ || ┐ CCD  CDD
+               │    │
+              BC   BCC
+        ```
+ 
+     23. Attempt to parse first pattern, `+`, of the current root `+` pattern, descending into it.
+
+     24. Successfully parse left pattern, `AB`, from input.
+ 
+     25. Attempt to parse second pattern , `||`, of the current `+` pattern, descending into it.
+ 
+     26. Take a snapshot of the current context.
+ 
+     27. Successfully parse left pattern, `BC` from the input.
+
+     28. Add recovery point for right pattern, `BCC`, using snapshot.
+ 
+     29. Propogate successful parsing result upwards to parent `+` pattern.
+ 
+     30. Propogate successful parsing result upwards to parent (root) `+` pattern.
+ 
+     31. Update pattern of recovery point to `BCC + (CCD || CDD)`.
+
+     32. Attempt to parse second pattern,  `||`, of the current `+` pattern, descending into it.
+
+     33. Attempt to parse `CCD` and fail. Try to parse the right pattern next instead.
+     
+     34. Attempt to parse `CDD` and fail.
+ 
+     35. Propogate failure upwards to parent (root) `+` pattern.
+ 
+     36. Propogate failure upwards to initial call site, `parseInput()`.
+
+     37. Check for recovery points to see if we can recover parsing.
+
+     38. Pop the last recovery point and revert the context to it. Start parsing from the recovery point's pattern, shown below.
+         ```
+          ┌── + ──┐
+          │       │
+         BCC    ┌ || ┐
+                │    |
+               CCD  CDD
+         ```
+ 
+     39. Successfully parse the left pattern of the current root `+` pattern.
+ 
+     40. Propogate successful parsing result upwards to parent (root) `+` pattern.
+ 
+     41. Attempt to parse second pattern, `||`, of the current `+` pattern, descending into it.
+ 
+     42. Attempt to parse `CCD` and fail. Try to parse the right pattern next instead.
+ 
+     43. Successfully parse `CDD` from input.
+ 
+     44. Propogate successful parsing result upwards to parent (root) `+` pattern.
+ 
+     45. Propogate successful parsing result upwards to initial call site, `parseInput()`.
+ 
+     46. Return `consumedTokens` property of context from `parseInput()`.
+ 
+     47. Propogate return value of`parseInput()` to return value of the invocation the `tokenize(_:)` method on our tokenizer instance.
+ */
+
